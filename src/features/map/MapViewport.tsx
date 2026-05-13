@@ -30,6 +30,10 @@ const countryLabels = [
   { label: "Antarctica", lat: -75, lon: 10 }
 ];
 
+const earthDayUrl = new URL("../../assets/earth/earth-day-noclouds.jpg", import.meta.url).href;
+const earthCloudsUrl = new URL("../../assets/earth/earth-day-clouds.jpg", import.meta.url).href;
+const earthNightUrl = new URL("../../assets/earth/earth-night-lights.jpg", import.meta.url).href;
+
 export function MapViewport({
   basemap,
   snapshot,
@@ -142,42 +146,23 @@ export function MapViewport({
 
 function WorldBackdrop({ basemap }: { basemap: EarthBasemap }) {
   return (
-    <svg
-      className={`world-backdrop ${basemap}`}
-      viewBox="0 0 1000 500"
-      preserveAspectRatio="none"
-      aria-hidden="true"
-    >
-      <defs>
-        <pattern id="graticule" width="100" height="50" patternUnits="userSpaceOnUse">
-          <path d="M100 0H0V50" />
-        </pattern>
-      </defs>
-      <rect className="ocean-field" width="1000" height="500" />
-      <rect className="graticule" width="1000" height="500" fill="url(#graticule)" />
-      <path
-        className="landmass north-america"
-        d="M95 112L166 72L257 82L302 139L278 211L230 241L218 302L156 298L118 236L69 210Z"
-      />
-      <path
-        className="landmass south-america"
-        d="M282 277L336 304L353 372L331 458L284 489L254 420L230 358L244 304Z"
-      />
-      <path
-        className="landmass europe-africa"
-        d="M458 115L530 98L602 126L583 182L532 193L548 263L520 374L465 368L423 286L444 206L403 168Z"
-      />
-      <path
-        className="landmass asia"
-        d="M560 111L680 78L805 104L872 174L848 242L766 257L705 225L630 252L581 204L610 151Z"
-      />
-      <path className="landmass australia" d="M750 328L832 312L891 350L866 405L779 400L731 362Z" />
-      <path className="landmass antarctica" d="M130 457L332 438L548 455L744 438L932 462L904 500H115Z" />
-      <path className="relief-line" d="M130 142C210 104 280 120 330 184" />
-      <path className="relief-line" d="M490 151C540 129 608 146 650 194" />
-      <path className="relief-line" d="M596 140C654 126 718 129 786 166" />
-      <path className="relief-line" d="M292 292C318 340 330 388 304 448" />
-    </svg>
+    <div className={`world-backdrop ${basemap}`} aria-hidden="true">
+      <img className="world-raster day" src={earthDayUrl} alt="" />
+      {basemap === "satellite" ? <img className="world-raster clouds" src={earthCloudsUrl} alt="" /> : null}
+      {basemap === "political" ? <img className="world-raster night" src={earthNightUrl} alt="" /> : null}
+      <span className="raster-graticule" />
+      <svg className="world-detail-lines" viewBox="0 0 1000 500" preserveAspectRatio="none">
+        <path className="relief-line" d="M76 151C185 78 286 107 345 183" />
+        <path className="relief-line" d="M270 286C316 342 323 406 288 470" />
+        <path className="relief-line" d="M449 125C514 103 594 134 646 202" />
+        <path className="relief-line" d="M583 142C656 116 753 124 842 188" />
+        <path className="relief-line" d="M732 340C786 318 855 330 905 374" />
+        <path className="boundary-line" d="M496 122L508 178L485 232L514 302L493 378" />
+        <path className="boundary-line" d="M584 116L626 168L675 196L727 229L783 221" />
+        <path className="boundary-line" d="M117 121L173 166L229 207L259 268" />
+        <path className="boundary-line" d="M254 300L304 348L310 421" />
+      </svg>
+    </div>
   );
 }
 

@@ -37,11 +37,11 @@ export function GlobeViewport(props: GlobeViewportProps) {
         }
       >
         <color attach="background" args={["#05070d"]} />
-        <fog attach="fog" args={["#05070d", 4.4, 8]} />
-        <ambientLight intensity={0.46} />
-        <directionalLight position={[4, 2.8, 3.2]} intensity={2.35} color="#fff1d0" />
-        <pointLight position={[-3, -2, -1]} intensity={0.74} color="#7ad7ff" />
-        <Stars radius={48} depth={36} count={2400} factor={2.45} saturation={0.35} fade />
+        <fog attach="fog" args={["#05070d", 4.8, 8.5]} />
+        <ambientLight intensity={0.32} />
+        <directionalLight position={[4.2, 2.8, 3.4]} intensity={2.85} color="#fff3d7" />
+        <pointLight position={[-3.4, -2.1, -1.2]} intensity={0.82} color="#7ad7ff" />
+        <Stars radius={54} depth={38} count={3600} factor={2.25} saturation={0.45} fade />
         <Suspense fallback={null}>
           <ProceduralGlobe {...props} />
         </Suspense>
@@ -70,7 +70,7 @@ function CameraRig({ controlsRef, zoomScalar }: CameraRigProps) {
   const { camera } = useThree();
 
   useFrame(() => {
-    const targetDistance = MathUtils.lerp(4.95, 2.7, zoomScalar);
+    const targetDistance = MathUtils.lerp(3.82, 2.28, zoomScalar);
     const currentDistance = camera.position.length();
     const nextDistance = MathUtils.lerp(currentDistance, targetDistance, 0.08);
 

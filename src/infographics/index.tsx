@@ -53,6 +53,9 @@ type HorizonRepo = {
 
 const MAP_WIDTH = 340;
 const MAP_HEIGHT = 190;
+const earthDayUrl = new URL("../assets/earth/earth-day-noclouds.jpg", import.meta.url).href;
+const earthCloudsUrl = new URL("../assets/earth/earth-day-clouds.jpg", import.meta.url).href;
+const earthNightUrl = new URL("../assets/earth/earth-night-lights.jpg", import.meta.url).href;
 
 const referenceHorizons: HorizonRepo[] = [
   {
@@ -99,7 +102,7 @@ export function BiomePressureMap({ year, snapshot, className }: SnapshotGraphicP
         viewBox={`0 0 ${MAP_WIDTH} ${MAP_HEIGHT}`}
       >
         <title>{`Biome pressure map for ${year}`}</title>
-        <MapBackdrop />
+        <MapBackdrop variant="biome" />
         <circle className="map-pressure map-pressure--green" cx="92" cy="112" r={22 + ratios.wildLoss * 10} />
         <circle
           className="map-pressure"
@@ -157,7 +160,7 @@ export function PopulationExpansionMap({ year, snapshot, className }: SnapshotGr
         viewBox={`0 0 ${MAP_WIDTH} ${MAP_HEIGHT}`}
       >
         <title>{`Population expansion map for ${year}`}</title>
-        <MapBackdrop />
+        <MapBackdrop variant="population" />
         {routePath ? <path className="population-route" d={routePath} /> : null}
         {visibleZoos.map((site, index) => {
           const point = project(site.lat, site.lon);
@@ -321,15 +324,56 @@ export function ReferenceRepoHorizonPanel({ year, snapshot, className }: Snapsho
   );
 }
 
-function MapBackdrop() {
+function MapBackdrop({ variant }: { variant: "biome" | "population" }) {
+  const raster = variant === "population" ? earthNightUrl : earthDayUrl;
+
   return (
     <>
       <rect className="map-water" width={MAP_WIDTH} height={MAP_HEIGHT} rx="14" />
-      <path
-        className="map-outline"
-        d="M26 92c40-62 109-69 164-44 31 14 70 2 100 19 31 18 35 69 6 91-35 27-84 2-122 2-42 0-81 22-119 1-25-14-43-47-29-69Z"
+      <image
+        className={`mini-map-raster ${variant}`}
+        href={raster}
+        x="0"
+        y="0"
+        width={MAP_WIDTH}
+        height={MAP_HEIGHT}
+        preserveAspectRatio="xMidYMid slice"
       />
+      {variant === "biome" ? (
+        <image
+          className="mini-map-raster cloud-pass"
+          href={earthCloudsUrl}
+          x="0"
+          y="0"
+          width={MAP_WIDTH}
+          height={MAP_HEIGHT}
+          preserveAspectRatio="xMidYMid slice"
+        />
+      ) : null}
+      {variant === "biome" ? (
+        <image
+          className="mini-map-raster muted-night"
+          href={earthNightUrl}
+          x="0"
+          y="0"
+          width={MAP_WIDTH}
+          height={MAP_HEIGHT}
+          preserveAspectRatio="xMidYMid slice"
+        />
+      ) : (
+        <image
+          className="mini-map-raster muted-day"
+          href={earthDayUrl}
+          x="0"
+          y="0"
+          width={MAP_WIDTH}
+          height={MAP_HEIGHT}
+          preserveAspectRatio="xMidYMid slice"
+        />
+      )}
       <path className="map-grid" d="M0 48h340M0 95h340M0 142h340M85 0v190M170 0v190M255 0v190" />
+      <path className="map-coast-trace" d="M48 60C94 35 138 43 183 58C225 71 266 64 314 82" />
+      <path className="map-coast-trace" d="M68 124C118 103 165 105 213 126C250 143 280 139 316 122" />
     </>
   );
 }
