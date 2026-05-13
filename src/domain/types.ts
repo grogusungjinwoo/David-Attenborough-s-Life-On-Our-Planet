@@ -104,11 +104,19 @@ export type ReferenceOverlay = {
   sourceRefs: SourceRef[];
 };
 
-export type MapProviderKind = "simulated-globe" | "google-3d-maps";
+export type MapProviderKind =
+  | "simulated-globe"
+  | "static-earth"
+  | "online-earth"
+  | "google-3d-maps";
 
 export type MapProviderCapabilities = {
   supportsPhotorealisticTiles: boolean;
   supportsProceduralLayers: boolean;
   requiresApiKey: boolean;
   supportsStaticHosting: boolean;
+  supports2DMode: boolean;
+  supportsPoliticalMode: boolean;
+  supportsTopographicMode: boolean;
+  supportsSatelliteMode: boolean;
 };

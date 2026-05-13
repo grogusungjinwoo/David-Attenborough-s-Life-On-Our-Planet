@@ -120,6 +120,64 @@ export const sourceCatalog = {
     url: "https://developers.google.com/maps/documentation/javascript/reference/3d-map",
     accessed: "2026-05-12"
   },
+  naturalEarth: {
+    id: "natural-earth-vectors",
+    label: "Natural Earth cultural and physical vectors",
+    publisher: "Natural Earth",
+    url: "https://www.naturalearthdata.com/downloads/",
+    accessed: "2026-05-13",
+    note:
+      "Public-domain cartographic source for low and mid zoom countries, coastlines, rivers, lakes, and labels."
+  },
+  nasaBlueMarble: {
+    id: "nasa-blue-marble-next-generation",
+    label: "Blue Marble Next Generation",
+    publisher: "NASA Earth Observatory",
+    url: "https://science.nasa.gov/earth/earth-observatory/blue-marble-next-generation/",
+    accessed: "2026-05-13",
+    note: "Open NASA global satellite basemap source for bundled static imagery."
+  },
+  noaaEtopo: {
+    id: "noaa-etopo-2022",
+    label: "ETOPO 2022 Global Relief Model",
+    publisher: "NOAA National Centers for Environmental Information",
+    url: "https://www.ncei.noaa.gov/products/etopo-global-relief-model",
+    accessed: "2026-05-13",
+    note: "Global relief source for topographic and bathymetric shading."
+  },
+  gebcoBathymetry: {
+    id: "gebco-global-bathymetry",
+    label: "GEBCO gridded bathymetry data",
+    publisher: "General Bathymetric Chart of the Oceans",
+    url: "https://www.gebco.net/data-products/gridded-bathymetry-data",
+    accessed: "2026-05-13",
+    note: "Primary global ocean bathymetry and seafloor relief source."
+  },
+  esaWorldCover: {
+    id: "esa-worldcover",
+    label: "ESA WorldCover global land cover",
+    publisher: "European Space Agency",
+    url: "https://esa-worldcover.org/en/data-access",
+    accessed: "2026-05-13",
+    note:
+      "Open land-cover source for vegetation, bare land, built-up, snow/ice, and water masks."
+  },
+  unSalb: {
+    id: "un-salb",
+    label: "Second Administrative Level Boundaries",
+    publisher: "United Nations Geospatial",
+    url: "https://salb.un.org/en",
+    accessed: "2026-05-13",
+    note: "Authoritative boundary cross-check source where available."
+  },
+  pmtiles: {
+    id: "pmtiles",
+    label: "PMTiles archive format",
+    publisher: "Protomaps",
+    url: "https://docs.protomaps.com/pmtiles/",
+    accessed: "2026-05-13",
+    note: "Range-request-friendly tile archive format for static vector/raster delivery."
+  },
   neuralGcm: {
     id: "neuralgcm-github",
     label: "NeuralGCM",

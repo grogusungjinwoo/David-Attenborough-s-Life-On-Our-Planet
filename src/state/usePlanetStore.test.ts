@@ -36,3 +36,57 @@ describe("usePlanetStore layer toggles", () => {
     expect(enabledState.layers.atmosphere).toBe(true);
   });
 });
+
+describe("usePlanetStore Earth view modes", () => {
+  beforeEach(() => {
+    usePlanetStore.setState(usePlanetStore.getInitialState(), true);
+  });
+
+  it("starts in the satellite globe preset", () => {
+    const state = usePlanetStore.getState();
+
+    expect(state.earthView).toBe("globe-satellite");
+    expect(state.viewMode).toBe("globe3d");
+    expect(state.earthBasemap).toBe("satellite");
+  });
+
+  it("switches topographic and satellite presets into 2D map mode", () => {
+    usePlanetStore.getState().selectSpecies("blue-whale");
+    usePlanetStore.getState().setEarthView("map-topographic");
+
+    const topoState = usePlanetStore.getState();
+
+    expect(topoState.viewMode).toBe("map2d");
+    expect(topoState.earthBasemap).toBe("topographic");
+    expect(topoState.selectedSpeciesId).toBe("blue-whale");
+
+    topoState.setEarthView("map-satellite");
+
+    const satelliteState = usePlanetStore.getState();
+
+    expect(satelliteState.viewMode).toBe("map2d");
+    expect(satelliteState.earthBasemap).toBe("satellite");
+    expect(satelliteState.selectedSpeciesId).toBe("blue-whale");
+  });
+
+  it("uses mode-aware zoom and reset behavior", () => {
+    usePlanetStore.getState().setEarthView("map-topographic");
+    usePlanetStore.getState().zoomIn();
+
+    const zoomedMap = usePlanetStore.getState();
+
+    expect(zoomedMap.mapViewport.zoom).toBeGreaterThan(1.4);
+    expect(zoomedMap.zoomScalar).toBe(0.48);
+
+    zoomedMap.resetView();
+
+    const resetMap = usePlanetStore.getState();
+
+    expect(resetMap.mapViewport.zoom).toBe(1.4);
+
+    resetMap.setEarthView("globe-satellite");
+    resetMap.zoomIn();
+
+    expect(usePlanetStore.getState().zoomScalar).toBeGreaterThan(0.48);
+  });
+});

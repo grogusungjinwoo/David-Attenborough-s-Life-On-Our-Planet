@@ -13,6 +13,14 @@ type StoryLayerKey = keyof StoryLayerState;
 export type PlanetLayerKey = AppLayerKey | StoryLayerKey;
 export type PlanetLayerState = AppLayerState & StoryLayerState;
 export type ZoomIntent = "idle" | "in" | "out" | "reset";
+export type EarthView = "globe-satellite" | "map-satellite" | "map-topographic" | "map-political";
+export type EarthViewMode = "globe3d" | "map2d";
+export type EarthBasemap = "satellite" | "topographic" | "political";
+
+export type MapViewport = {
+  zoom: number;
+  center: [number, number];
+};
 
 export type PlanetAction =
   | { type: "yearSelected"; year: number }
@@ -21,6 +29,7 @@ export type PlanetAction =
   | { type: "zooSelected"; zooId?: string }
   | { type: "layerToggled"; layer: PlanetLayerKey }
   | { type: "layerSet"; layer: PlanetLayerKey; enabled: boolean }
+  | { type: "earthViewSelected"; earthView: EarthView }
   | { type: "zoomed"; intent: Exclude<ZoomIntent, "idle"> }
   | { type: "debugToggled" };
 
@@ -31,6 +40,7 @@ export type PlanetActions = {
   selectZoo: (zooId?: string) => void;
   toggleLayer: (layer: PlanetLayerKey) => void;
   setLayer: (layer: PlanetLayerKey, enabled: boolean) => void;
+  setEarthView: (earthView: EarthView) => void;
   zoomIn: () => void;
   zoomOut: () => void;
   resetView: () => void;
@@ -43,6 +53,10 @@ export type PlanetState = {
   selectedRegionId?: string;
   selectedSpeciesId?: string;
   selectedZooId?: string;
+  earthView: EarthView;
+  viewMode: EarthViewMode;
+  earthBasemap: EarthBasemap;
+  mapViewport: MapViewport;
   layers: PlanetLayerState;
   layerToggles: StoryLayerState;
   snapshot: WorldSnapshot;
@@ -57,6 +71,7 @@ export type PlanetState = {
   selectZoo: (zooId?: string) => void;
   toggleLayer: (layer: PlanetLayerKey) => void;
   setLayer: (layer: PlanetLayerKey, enabled: boolean) => void;
+  setEarthView: (earthView: EarthView) => void;
   zoomIn: () => void;
   zoomOut: () => void;
   resetView: () => void;
@@ -65,7 +80,9 @@ export type PlanetState = {
 
 const initialYear = 2024;
 const initialZoomScalar = 0.48;
+const initialMapViewport: MapViewport = { zoom: 1.4, center: [0, 12] };
 const zoomStep = 0.14;
+const mapZoomStep = 0.32;
 
 const layerCounterparts: Partial<Record<PlanetLayerKey, PlanetLayerKey[]>> = {
   atmosphere: ["climate"],
@@ -133,6 +150,16 @@ function layerUpdate(
   };
 }
 
+function earthViewState(earthView: EarthView): Pick<PlanetState, "earthView" | "viewMode" | "earthBasemap"> {
+  const [mode, basemap] = earthView.split("-") as ["globe" | "map", EarthBasemap];
+
+  return {
+    earthView,
+    viewMode: mode === "globe" ? "globe3d" : "map2d",
+    earthBasemap: basemap
+  };
+}
+
 function reducePlanetState(
   state: PlanetState,
   action: PlanetAction
@@ -172,7 +199,27 @@ function reducePlanetState(
       );
     case "layerSet":
       return layerUpdate(state, action.layer, action.enabled);
+    case "earthViewSelected":
+      return earthViewState(action.earthView);
     case "zoomed":
+      if (state.viewMode === "map2d") {
+        return {
+          zoomIntent: action.intent,
+          mapViewport:
+            action.intent === "reset"
+              ? initialMapViewport
+              : {
+                  ...state.mapViewport,
+                  zoom: clamp(
+                    state.mapViewport.zoom +
+                      (action.intent === "in" ? mapZoomStep : -mapZoomStep),
+                    0.6,
+                    6
+                  )
+                }
+        };
+      }
+
       return {
         zoomIntent: action.intent,
         zoomScalar:
@@ -202,6 +249,7 @@ export const usePlanetStore = create<PlanetState>((set) => {
     selectZoo: (zooId) => dispatch({ type: "zooSelected", zooId }),
     toggleLayer: (layer) => dispatch({ type: "layerToggled", layer }),
     setLayer: (layer, enabled) => dispatch({ type: "layerSet", layer, enabled }),
+    setEarthView: (earthView) => dispatch({ type: "earthViewSelected", earthView }),
     zoomIn: () => dispatch({ type: "zoomed", intent: "in" }),
     zoomOut: () => dispatch({ type: "zoomed", intent: "out" }),
     resetView: () => dispatch({ type: "zoomed", intent: "reset" }),
@@ -214,6 +262,10 @@ export const usePlanetStore = create<PlanetState>((set) => {
     selectedRegionId: undefined,
     selectedSpeciesId: undefined,
     selectedZooId: undefined,
+    earthView: "globe-satellite",
+    viewMode: "globe3d",
+    earthBasemap: "satellite",
+    mapViewport: initialMapViewport,
     layers,
     layerToggles,
     snapshot: deriveSnapshot(initialYear, layerToggles),
@@ -228,6 +280,7 @@ export const usePlanetStore = create<PlanetState>((set) => {
     selectZoo: actions.selectZoo,
     toggleLayer: actions.toggleLayer,
     setLayer: actions.setLayer,
+    setEarthView: actions.setEarthView,
     zoomIn: actions.zoomIn,
     zoomOut: actions.zoomOut,
     resetView: actions.resetView,

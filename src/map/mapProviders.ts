@@ -1,16 +1,24 @@
+import { sourceCatalog } from "../data/sources";
 import type {
   MapProviderCapabilities,
   MapProviderKind,
   WorldSnapshot
 } from "../domain/types";
-import { sourceCatalog } from "../data/sources";
+export {
+  earthBasemapDescriptors,
+  earthDomainWorkstreams,
+  staticEarthManifest,
+  type EarthBasemapDescriptor,
+  type EarthBasemapId,
+  type EarthDomainWorkstream
+} from "./earthManifest";
 
 export type MapProviderDescriptor = {
   kind: MapProviderKind;
   label: string;
   description: string;
   capabilities: MapProviderCapabilities;
-  sourceRefs: Array<typeof sourceCatalog[keyof typeof sourceCatalog]>;
+  sourceRefs: Array<(typeof sourceCatalog)[keyof typeof sourceCatalog]>;
 };
 
 export type PlanetLayerPayload = {
@@ -25,6 +33,35 @@ export interface PlanetMapProvider {
   prepareLayers(payload: PlanetLayerPayload): PlanetLayerPayload;
 }
 
+export const staticEarthProvider: PlanetMapProvider = {
+  descriptor: {
+    kind: "static-earth",
+    label: "Static open Earth atlas",
+    description:
+      "Open/rehostable Earth provider scaffold for accurate countries, topography, bathymetry, satellite basemaps, and regional QA workstreams.",
+    capabilities: {
+      supportsPhotorealisticTiles: false,
+      supportsProceduralLayers: true,
+      requiresApiKey: false,
+      supportsStaticHosting: true,
+      supports2DMode: true,
+      supportsPoliticalMode: true,
+      supportsTopographicMode: true,
+      supportsSatelliteMode: true
+    },
+    sourceRefs: [
+      sourceCatalog.naturalEarth,
+      sourceCatalog.nasaBlueMarble,
+      sourceCatalog.noaaEtopo,
+      sourceCatalog.gebcoBathymetry,
+      sourceCatalog.esaWorldCover
+    ]
+  },
+  prepareLayers(payload) {
+    return payload;
+  }
+};
+
 export const simulatedGlobeProvider: PlanetMapProvider = {
   descriptor: {
     kind: "simulated-globe",
@@ -35,7 +72,11 @@ export const simulatedGlobeProvider: PlanetMapProvider = {
       supportsPhotorealisticTiles: false,
       supportsProceduralLayers: true,
       requiresApiKey: false,
-      supportsStaticHosting: true
+      supportsStaticHosting: true,
+      supports2DMode: false,
+      supportsPoliticalMode: false,
+      supportsTopographicMode: false,
+      supportsSatelliteMode: false
     },
     sourceRefs: []
   },
@@ -53,12 +94,17 @@ export const google3dMapsProviderDescriptor: MapProviderDescriptor = {
     supportsPhotorealisticTiles: true,
     supportsProceduralLayers: true,
     requiresApiKey: true,
-    supportsStaticHosting: true
+    supportsStaticHosting: true,
+    supports2DMode: false,
+    supportsPoliticalMode: false,
+    supportsTopographicMode: true,
+    supportsSatelliteMode: true
   },
   sourceRefs: [sourceCatalog.google3dMaps, sourceCatalog.google3dTiles]
 };
 
 export const availableMapProviders = [
+  staticEarthProvider.descriptor,
   simulatedGlobeProvider.descriptor,
   google3dMapsProviderDescriptor
 ];
