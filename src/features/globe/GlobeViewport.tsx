@@ -27,9 +27,9 @@ export function GlobeViewport(props: GlobeViewportProps) {
     <section className="globe-viewport" aria-label="Interactive simulated globe">
       <Canvas
         data-testid="globe-canvas"
-        camera={{ position: [0.35, 0.2, 3.35], fov: 43, near: 0.1, far: 100 }}
+        camera={{ position: [0.34, 0.18, 3.9], fov: 39, near: 0.1, far: 100 }}
         dpr={[1, 2]}
-        gl={{ antialias: true, alpha: false, preserveDrawingBuffer: true }}
+        gl={{ antialias: true, alpha: false }}
         fallback={
           <div className="globe-fallback" role="status">
             3D globe unavailable in this browser. Timeline and source panels remain available.
@@ -38,10 +38,10 @@ export function GlobeViewport(props: GlobeViewportProps) {
       >
         <color attach="background" args={["#05070d"]} />
         <fog attach="fog" args={["#05070d", 4.4, 8]} />
-        <ambientLight intensity={0.55} />
-        <directionalLight position={[4, 2.8, 3.2]} intensity={2.1} color="#fff1d0" />
-        <pointLight position={[-3, -2, -1]} intensity={0.9} color="#7ad7ff" />
-        <Stars radius={42} depth={32} count={1600} factor={2.8} saturation={0.4} fade />
+        <ambientLight intensity={0.46} />
+        <directionalLight position={[4, 2.8, 3.2]} intensity={2.35} color="#fff1d0" />
+        <pointLight position={[-3, -2, -1]} intensity={0.74} color="#7ad7ff" />
+        <Stars radius={48} depth={36} count={2400} factor={2.45} saturation={0.35} fade />
         <Suspense fallback={null}>
           <ProceduralGlobe {...props} />
         </Suspense>
@@ -52,8 +52,8 @@ export function GlobeViewport(props: GlobeViewportProps) {
           dampingFactor={0.08}
           autoRotate
           autoRotateSpeed={0.23}
-          minDistance={1.9}
-          maxDistance={5.2}
+          minDistance={2.8}
+          maxDistance={6.1}
         />
         <CameraRig controlsRef={controlsRef} zoomScalar={props.zoomScalar} />
       </Canvas>
@@ -70,7 +70,7 @@ function CameraRig({ controlsRef, zoomScalar }: CameraRigProps) {
   const { camera } = useThree();
 
   useFrame(() => {
-    const targetDistance = MathUtils.lerp(4.65, 2.15, zoomScalar);
+    const targetDistance = MathUtils.lerp(4.95, 2.7, zoomScalar);
     const currentDistance = camera.position.length();
     const nextDistance = MathUtils.lerp(currentDistance, targetDistance, 0.08);
 
