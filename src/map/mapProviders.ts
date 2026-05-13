@@ -7,6 +7,7 @@ import type {
 export {
   earthBasemapDescriptors,
   earthDomainWorkstreams,
+  earthTextureManifest,
   staticEarthManifest,
   type EarthBasemapDescriptor,
   type EarthBasemapId,

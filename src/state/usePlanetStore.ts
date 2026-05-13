@@ -1,6 +1,16 @@
 import { create } from "zustand";
 import { defaultLayers } from "../domain/timeline";
-import type { LayerState as AppLayerState } from "../domain/types";
+import type {
+  GlobeActiveView,
+  GeoChangeLayerId,
+  GlobeQuality,
+  GlobeViewState,
+  LayerState as AppLayerState,
+  PrimarySection,
+  WitnessTab,
+  WildSpaceDefinition
+} from "../domain/types";
+import { clampLatitude, wrapLongitude } from "../features/globe/spherical";
 import {
   getWorldSnapshot,
   type LayerState as StoryLayerState,
@@ -13,7 +23,7 @@ type StoryLayerKey = keyof StoryLayerState;
 export type PlanetLayerKey = AppLayerKey | StoryLayerKey;
 export type PlanetLayerState = AppLayerState & StoryLayerState;
 export type ZoomIntent = "idle" | "in" | "out" | "reset";
-export type EarthView = "globe-satellite" | "map-satellite" | "map-topographic" | "map-political";
+export type EarthView = GlobeActiveView;
 export type EarthViewMode = "globe3d" | "map2d";
 export type EarthBasemap = "satellite" | "topographic" | "political";
 
@@ -29,7 +39,16 @@ export type PlanetAction =
   | { type: "zooSelected"; zooId?: string }
   | { type: "layerToggled"; layer: PlanetLayerKey }
   | { type: "layerSet"; layer: PlanetLayerKey; enabled: boolean }
-  | { type: "earthViewSelected"; earthView: EarthView }
+  | { type: "activeViewSelected"; activeView: GlobeActiveView }
+  | { type: "geoChangeLayerSelected"; layerId: GeoChangeLayerId }
+  | { type: "qualitySelected"; quality: GlobeQuality }
+  | { type: "wildSpaceDefinitionSelected"; definition: WildSpaceDefinition }
+  | { type: "primarySectionSelected"; section: PrimarySection }
+  | { type: "witnessTabSelected"; tab: WitnessTab }
+  | { type: "fullscreenRequested"; requested: boolean }
+  | { type: "searchQueryChanged"; query: string }
+  | { type: "globePanned"; longitudeDeltaDeg: number; latitudeDeltaDeg: number }
+  | { type: "globeZoomed"; delta: number }
   | { type: "zoomed"; intent: Exclude<ZoomIntent, "idle"> }
   | { type: "debugToggled" };
 
@@ -40,7 +59,17 @@ export type PlanetActions = {
   selectZoo: (zooId?: string) => void;
   toggleLayer: (layer: PlanetLayerKey) => void;
   setLayer: (layer: PlanetLayerKey, enabled: boolean) => void;
+  setActiveView: (activeView: GlobeActiveView) => void;
+  setActiveGeoChangeLayer: (layerId: GeoChangeLayerId) => void;
   setEarthView: (earthView: EarthView) => void;
+  setQuality: (quality: GlobeQuality) => void;
+  setWildSpaceDefinition: (definition: WildSpaceDefinition) => void;
+  setActivePrimarySection: (section: PrimarySection) => void;
+  setActiveWitnessTab: (tab: WitnessTab) => void;
+  setFullscreenRequested: (requested: boolean) => void;
+  setSearchQuery: (query: string) => void;
+  panGlobeView: (longitudeDeltaDeg: number, latitudeDeltaDeg: number) => void;
+  zoomGlobeView: (delta: number) => void;
   zoomIn: () => void;
   zoomOut: () => void;
   resetView: () => void;
@@ -53,6 +82,14 @@ export type PlanetState = {
   selectedRegionId?: string;
   selectedSpeciesId?: string;
   selectedZooId?: string;
+  globeView: GlobeViewState;
+  activeView: GlobeActiveView;
+  activeGeoChangeLayer: GeoChangeLayerId;
+  wildSpaceDefinition: WildSpaceDefinition;
+  activePrimarySection: PrimarySection;
+  activeWitnessTab: WitnessTab;
+  isFullscreenRequested: boolean;
+  searchQuery: string;
   earthView: EarthView;
   viewMode: EarthViewMode;
   earthBasemap: EarthBasemap;
@@ -71,7 +108,17 @@ export type PlanetState = {
   selectZoo: (zooId?: string) => void;
   toggleLayer: (layer: PlanetLayerKey) => void;
   setLayer: (layer: PlanetLayerKey, enabled: boolean) => void;
+  setActiveView: (activeView: GlobeActiveView) => void;
+  setActiveGeoChangeLayer: (layerId: GeoChangeLayerId) => void;
   setEarthView: (earthView: EarthView) => void;
+  setQuality: (quality: GlobeQuality) => void;
+  setWildSpaceDefinition: (definition: WildSpaceDefinition) => void;
+  setActivePrimarySection: (section: PrimarySection) => void;
+  setActiveWitnessTab: (tab: WitnessTab) => void;
+  setFullscreenRequested: (requested: boolean) => void;
+  setSearchQuery: (query: string) => void;
+  panGlobeView: (longitudeDeltaDeg: number, latitudeDeltaDeg: number) => void;
+  zoomGlobeView: (delta: number) => void;
   zoomIn: () => void;
   zoomOut: () => void;
   resetView: () => void;
@@ -80,6 +127,13 @@ export type PlanetState = {
 
 const initialYear = 2024;
 const initialZoomScalar = 0.48;
+const initialGlobeView: GlobeViewState = {
+  longitudeDeg: -38,
+  latitudeDeg: 12,
+  zoomScalar: initialZoomScalar,
+  activeView: "space",
+  quality: "auto"
+};
 const initialMapViewport: MapViewport = { zoom: 1.4, center: [0, 12] };
 const zoomStep = 0.14;
 const mapZoomStep = 0.32;
@@ -150,13 +204,26 @@ function layerUpdate(
   };
 }
 
-function earthViewState(earthView: EarthView): Pick<PlanetState, "earthView" | "viewMode" | "earthBasemap"> {
-  const [mode, basemap] = earthView.split("-") as ["globe" | "map", EarthBasemap];
+function activeViewLayerUpdate(
+  state: PlanetState,
+  activeView: GlobeActiveView
+): Pick<PlanetState, "activeView" | "earthView" | "globeView" | "layers" | "layerToggles" | "snapshot"> {
+  const layers = {
+    ...state.layers,
+    topographicRelief: activeView === "topographic" || state.layers.topographicRelief,
+    adminBoundaries: activeView === "admin-regions" || state.layers.adminBoundaries,
+    wildSpace: activeView === "wild-evidence" || state.layers.wildSpace,
+    vegetation: activeView === "wild-evidence" || state.layers.vegetation
+  };
+  const layerToggles = pickStoryLayers(layers);
 
   return {
-    earthView,
-    viewMode: mode === "globe" ? "globe3d" : "map2d",
-    earthBasemap: basemap
+    activeView,
+    earthView: activeView,
+    globeView: { ...state.globeView, activeView },
+    layers,
+    layerToggles,
+    snapshot: deriveSnapshot(state.selectedYear, layerToggles)
   };
 }
 
@@ -199,38 +266,100 @@ function reducePlanetState(
       );
     case "layerSet":
       return layerUpdate(state, action.layer, action.enabled);
-    case "earthViewSelected":
-      return earthViewState(action.earthView);
+    case "activeViewSelected":
+      return activeViewLayerUpdate(state, action.activeView);
+    case "geoChangeLayerSelected":
+      return {
+        activeGeoChangeLayer: action.layerId
+      };
+    case "qualitySelected":
+      return {
+        globeView: { ...state.globeView, quality: action.quality }
+      };
+    case "wildSpaceDefinitionSelected":
+      return {
+        wildSpaceDefinition: action.definition
+      };
+    case "primarySectionSelected":
+      return {
+        activePrimarySection: action.section,
+        activeWitnessTab:
+          action.section === "stories"
+            ? "stories"
+            : action.section === "overview"
+              ? "witness"
+              : state.activeWitnessTab
+      };
+    case "witnessTabSelected":
+      return {
+        activeWitnessTab: action.tab
+      };
+    case "fullscreenRequested":
+      return {
+        isFullscreenRequested: action.requested
+      };
+    case "searchQueryChanged":
+      return {
+        searchQuery: action.query,
+        activePrimarySection: action.query.trim() ? "search" : state.activePrimarySection
+      };
+    case "globePanned":
+      return {
+        globeView: {
+          ...state.globeView,
+          longitudeDeg: wrapLongitude(state.globeView.longitudeDeg + action.longitudeDeltaDeg),
+          latitudeDeg: clampLatitude(state.globeView.latitudeDeg + action.latitudeDeltaDeg)
+        }
+      };
+    case "globeZoomed": {
+      const zoomScalar = clamp(state.globeView.zoomScalar + action.delta, 0, 1);
+
+      return {
+        zoomScalar,
+        globeView: {
+          ...state.globeView,
+          zoomScalar
+        }
+      };
+    }
     case "zoomed":
-      if (state.viewMode === "map2d") {
+      if (action.intent === "reset") {
         return {
           zoomIntent: action.intent,
-          mapViewport:
-            action.intent === "reset"
-              ? initialMapViewport
-              : {
-                  ...state.mapViewport,
-                  zoom: clamp(
-                    state.mapViewport.zoom +
-                      (action.intent === "in" ? mapZoomStep : -mapZoomStep),
-                    0.6,
-                    6
-                  )
-                }
+          zoomScalar: initialZoomScalar,
+          globeView: {
+            ...initialGlobeView,
+            activeView: state.globeView.activeView,
+            quality: state.globeView.quality
+          },
+          mapViewport: initialMapViewport
         };
       }
 
-      return {
-        zoomIntent: action.intent,
-        zoomScalar:
-          action.intent === "reset"
-            ? initialZoomScalar
-            : clamp(
-                state.zoomScalar + (action.intent === "in" ? zoomStep : -zoomStep),
-                0,
-                1
-              )
-      };
+      {
+        const zoomScalar = clamp(
+          state.globeView.zoomScalar + (action.intent === "in" ? zoomStep : -zoomStep),
+          0,
+          1
+        );
+
+        return {
+          zoomIntent: action.intent,
+          zoomScalar,
+          globeView: {
+            ...state.globeView,
+            zoomScalar
+          },
+          mapViewport: {
+            ...state.mapViewport,
+            zoom: clamp(
+              state.mapViewport.zoom + (action.intent === "in" ? mapZoomStep : -mapZoomStep),
+              0.6,
+              6
+            )
+          }
+        };
+      }
     case "debugToggled":
       return { debugOpen: !state.debugOpen };
   }
@@ -249,7 +378,22 @@ export const usePlanetStore = create<PlanetState>((set) => {
     selectZoo: (zooId) => dispatch({ type: "zooSelected", zooId }),
     toggleLayer: (layer) => dispatch({ type: "layerToggled", layer }),
     setLayer: (layer, enabled) => dispatch({ type: "layerSet", layer, enabled }),
-    setEarthView: (earthView) => dispatch({ type: "earthViewSelected", earthView }),
+    setActiveView: (activeView) => dispatch({ type: "activeViewSelected", activeView }),
+    setActiveGeoChangeLayer: (layerId) =>
+      dispatch({ type: "geoChangeLayerSelected", layerId }),
+    setEarthView: (earthView) => dispatch({ type: "activeViewSelected", activeView: earthView }),
+    setQuality: (quality) => dispatch({ type: "qualitySelected", quality }),
+    setWildSpaceDefinition: (definition) =>
+      dispatch({ type: "wildSpaceDefinitionSelected", definition }),
+    setActivePrimarySection: (section) =>
+      dispatch({ type: "primarySectionSelected", section }),
+    setActiveWitnessTab: (tab) => dispatch({ type: "witnessTabSelected", tab }),
+    setFullscreenRequested: (requested) =>
+      dispatch({ type: "fullscreenRequested", requested }),
+    setSearchQuery: (query) => dispatch({ type: "searchQueryChanged", query }),
+    panGlobeView: (longitudeDeltaDeg, latitudeDeltaDeg) =>
+      dispatch({ type: "globePanned", longitudeDeltaDeg, latitudeDeltaDeg }),
+    zoomGlobeView: (delta) => dispatch({ type: "globeZoomed", delta }),
     zoomIn: () => dispatch({ type: "zoomed", intent: "in" }),
     zoomOut: () => dispatch({ type: "zoomed", intent: "out" }),
     resetView: () => dispatch({ type: "zoomed", intent: "reset" }),
@@ -262,7 +406,15 @@ export const usePlanetStore = create<PlanetState>((set) => {
     selectedRegionId: undefined,
     selectedSpeciesId: undefined,
     selectedZooId: undefined,
-    earthView: "globe-satellite",
+    globeView: initialGlobeView,
+    activeView: "space",
+    wildSpaceDefinition: "witness-story",
+    activeGeoChangeLayer: "wild-space",
+    activePrimarySection: "overview",
+    activeWitnessTab: "witness",
+    isFullscreenRequested: false,
+    searchQuery: "",
+    earthView: "space",
     viewMode: "globe3d",
     earthBasemap: "satellite",
     mapViewport: initialMapViewport,
@@ -280,7 +432,17 @@ export const usePlanetStore = create<PlanetState>((set) => {
     selectZoo: actions.selectZoo,
     toggleLayer: actions.toggleLayer,
     setLayer: actions.setLayer,
+    setActiveView: actions.setActiveView,
+    setActiveGeoChangeLayer: actions.setActiveGeoChangeLayer,
     setEarthView: actions.setEarthView,
+    setQuality: actions.setQuality,
+    setWildSpaceDefinition: actions.setWildSpaceDefinition,
+    setActivePrimarySection: actions.setActivePrimarySection,
+    setActiveWitnessTab: actions.setActiveWitnessTab,
+    setFullscreenRequested: actions.setFullscreenRequested,
+    setSearchQuery: actions.setSearchQuery,
+    panGlobeView: actions.panGlobeView,
+    zoomGlobeView: actions.zoomGlobeView,
     zoomIn: actions.zoomIn,
     zoomOut: actions.zoomOut,
     resetView: actions.resetView,

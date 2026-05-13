@@ -1,4 +1,5 @@
 import { Vector3 } from "three";
+import type { GlobeViewState } from "../../domain/types";
 
 const DEG_TO_RAD = Math.PI / 180;
 
@@ -19,6 +20,20 @@ export function latLonToVector3(lat: number, lon: number, radius = 1) {
     radius * Math.cos(phi),
     radius * Math.sin(phi) * Math.sin(theta)
   );
+}
+
+export function clampLatitude(latitudeDeg: number) {
+  return clamp(latitudeDeg, -82, 82);
+}
+
+export function wrapLongitude(longitudeDeg: number) {
+  return ((((longitudeDeg + 180) % 360) + 360) % 360) - 180;
+}
+
+export function globeViewToCameraPosition(view: GlobeViewState) {
+  const distance = 3.85 - view.zoomScalar * 1.55;
+
+  return latLonToVector3(clampLatitude(view.latitudeDeg), view.longitudeDeg, distance);
 }
 
 export function seededRandom(seed: number) {
@@ -53,7 +68,7 @@ export function makeClusteredSurfacePoints(options: {
     points.push({
       id: `${options.seed}-${index}`,
       lat: clamp(cluster.lat + latOffset, -82, 82),
-      lon: wrapLon(cluster.lon + lonOffset),
+      lon: wrapLongitude(cluster.lon + lonOffset),
       scale
     });
   }
@@ -63,16 +78,4 @@ export function makeClusteredSurfacePoints(options: {
 
 function clamp(value: number, min: number, max: number) {
   return Math.min(max, Math.max(min, value));
-}
-
-function wrapLon(lon: number) {
-  if (lon > 180) {
-    return lon - 360;
-  }
-
-  if (lon < -180) {
-    return lon + 360;
-  }
-
-  return lon;
 }

@@ -42,51 +42,95 @@ describe("usePlanetStore Earth view modes", () => {
     usePlanetStore.setState(usePlanetStore.getInitialState(), true);
   });
 
-  it("starts in the satellite globe preset", () => {
+  it("starts in the Earth from space globe preset", () => {
     const state = usePlanetStore.getState();
 
-    expect(state.earthView).toBe("globe-satellite");
+    expect(state.activeView).toBe("space");
+    expect(state.earthView).toBe("space");
     expect(state.viewMode).toBe("globe3d");
-    expect(state.earthBasemap).toBe("satellite");
+    expect(state.globeView.longitudeDeg).toBe(-38);
+    expect(state.globeView.latitudeDeg).toBe(12);
   });
 
-  it("switches topographic and satellite presets into 2D map mode", () => {
+  it("switches topographic and administrative globe views without clearing selections", () => {
     usePlanetStore.getState().selectSpecies("blue-whale");
-    usePlanetStore.getState().setEarthView("map-topographic");
+    usePlanetStore.getState().setActiveView("topographic");
 
     const topoState = usePlanetStore.getState();
 
-    expect(topoState.viewMode).toBe("map2d");
-    expect(topoState.earthBasemap).toBe("topographic");
+    expect(topoState.activeView).toBe("topographic");
+    expect(topoState.globeView.activeView).toBe("topographic");
+    expect(topoState.layers.topographicRelief).toBe(true);
     expect(topoState.selectedSpeciesId).toBe("blue-whale");
 
-    topoState.setEarthView("map-satellite");
+    topoState.setEarthView("admin-regions");
 
-    const satelliteState = usePlanetStore.getState();
+    const adminState = usePlanetStore.getState();
 
-    expect(satelliteState.viewMode).toBe("map2d");
-    expect(satelliteState.earthBasemap).toBe("satellite");
-    expect(satelliteState.selectedSpeciesId).toBe("blue-whale");
+    expect(adminState.activeView).toBe("admin-regions");
+    expect(adminState.layers.adminBoundaries).toBe(true);
+    expect(adminState.selectedSpeciesId).toBe("blue-whale");
   });
 
-  it("uses mode-aware zoom and reset behavior", () => {
-    usePlanetStore.getState().setEarthView("map-topographic");
+  it("uses wrapped longitude, clamped latitude, zoom, and reset behavior", () => {
     usePlanetStore.getState().zoomIn();
+    usePlanetStore.getState().panGlobeView(740, 150);
 
-    const zoomedMap = usePlanetStore.getState();
+    const zoomedGlobe = usePlanetStore.getState();
 
-    expect(zoomedMap.mapViewport.zoom).toBeGreaterThan(1.4);
-    expect(zoomedMap.zoomScalar).toBe(0.48);
+    expect(zoomedGlobe.globeView.zoomScalar).toBeGreaterThan(0.48);
+    expect(zoomedGlobe.globeView.longitudeDeg).toBe(-18);
+    expect(zoomedGlobe.globeView.latitudeDeg).toBe(82);
 
-    zoomedMap.resetView();
+    zoomedGlobe.zoomGlobeView(-4);
+    expect(usePlanetStore.getState().globeView.zoomScalar).toBe(0);
 
-    const resetMap = usePlanetStore.getState();
+    usePlanetStore.getState().resetView();
 
-    expect(resetMap.mapViewport.zoom).toBe(1.4);
+    const resetGlobe = usePlanetStore.getState();
+    expect(resetGlobe.globeView.zoomScalar).toBe(0.48);
+    expect(resetGlobe.globeView.longitudeDeg).toBe(-38);
+    expect(resetGlobe.globeView.latitudeDeg).toBe(12);
+  });
 
-    resetMap.setEarthView("globe-satellite");
-    resetMap.zoomIn();
+  it("tracks wild-space definition mode independently from the witness metric", () => {
+    usePlanetStore.getState().setWildSpaceDefinition("low-human-footprint");
 
-    expect(usePlanetStore.getState().zoomScalar).toBeGreaterThan(0.48);
+    expect(usePlanetStore.getState().wildSpaceDefinition).toBe("low-human-footprint");
+    expect(usePlanetStore.getState().snapshot.metrics.remainingWildSpacePercent).toBeDefined();
+  });
+
+  it("preserves the selected geographic change layer across globe view changes", () => {
+    usePlanetStore.getState().setActiveGeoChangeLayer("ocean-ice");
+    usePlanetStore.getState().setActiveView("topographic");
+
+    expect(usePlanetStore.getState().activeGeoChangeLayer).toBe("ocean-ice");
+
+    usePlanetStore.getState().setActiveView("space");
+
+    expect(usePlanetStore.getState().activeGeoChangeLayer).toBe("ocean-ice");
+  });
+
+  it("tracks editorial navigation, witness tabs, fullscreen, and search query", () => {
+    const state = usePlanetStore.getState();
+
+    expect(state.activePrimarySection).toBe("overview");
+    expect(state.activeWitnessTab).toBe("witness");
+    expect(state.isFullscreenRequested).toBe(false);
+    expect(state.searchQuery).toBe("");
+
+    state.setActivePrimarySection("stories");
+    expect(usePlanetStore.getState().activePrimarySection).toBe("stories");
+    expect(usePlanetStore.getState().activeWitnessTab).toBe("stories");
+
+    usePlanetStore.getState().setActiveWitnessTab("insights");
+    expect(usePlanetStore.getState().activeWitnessTab).toBe("insights");
+
+    usePlanetStore.getState().setFullscreenRequested(true);
+    expect(usePlanetStore.getState().isFullscreenRequested).toBe(true);
+
+    usePlanetStore.getState().setSearchQuery("orangutan");
+    expect(usePlanetStore.getState().searchQuery).toBe("orangutan");
+    expect(usePlanetStore.getState().activePrimarySection).toBe("search");
   });
 });

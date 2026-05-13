@@ -1,4 +1,5 @@
 import type {
+  EarthSurfaceState,
   LayerState,
   MetricSnapshot,
   SourceRef,
@@ -13,6 +14,8 @@ export const defaultLayers: LayerState = {
   vegetation: true,
   oceans: true,
   mountains: true,
+  topographicRelief: true,
+  adminBoundaries: true,
   settlements: true,
   wildSpace: true,
   population: true,
@@ -30,6 +33,22 @@ const metricKeys = [
   "speciesAtRiskCount",
   "extinctSpeciesCount"
 ] satisfies Array<keyof MetricSnapshot>;
+
+const earthSurfaceKeys = [
+  "forestGreenCoveragePercent",
+  "cropPastureCoveragePercent",
+  "vegetationIndex",
+  "oceanHeatIndex",
+  "weatherEnergyIndex",
+  "humanExposureIndex",
+  "nightLightIndex",
+  "cloudOpacity"
+] satisfies Array<
+  Exclude<
+    keyof EarthSurfaceState,
+    "confidence" | "projection" | "summary" | "sourceRefs"
+  >
+>;
 
 export function deriveWildSpaceAcres(
   remainingWildSpacePercent?: number,
@@ -120,12 +139,99 @@ export function interpolateMetrics(
   return enrichMetrics(metrics);
 }
 
+export function deriveEarthSurfaceFromMetrics(
+  metrics: MetricSnapshot,
+  sourceRefs: SourceRef[] = []
+): EarthSurfaceState {
+  const wildSpace = clamp((metrics.remainingWildSpacePercent ?? 50) / 100, 0, 1);
+  const population = clamp((metrics.worldPopulationBillion ?? 0) / 8.2, 0, 1);
+  const carbonPressure = clamp(((metrics.atmosphericCarbonPpm ?? 280) - 280) / 150, 0, 1);
+  const humanExposure = clamp(population * 0.68 + (1 - wildSpace) * 0.32, 0, 1);
+
+  return {
+    forestGreenCoveragePercent: roundTo(24 + wildSpace * 34, 1),
+    cropPastureCoveragePercent: roundTo(6 + humanExposure * 32, 1),
+    vegetationIndex: roundTo(clamp(wildSpace * 0.92 + 0.03, 0.05, 0.95), 3),
+    oceanHeatIndex: roundTo(clamp(carbonPressure * 0.82 + population * 0.12, 0, 1), 3),
+    weatherEnergyIndex: roundTo(clamp(carbonPressure * 0.76 + population * 0.16, 0, 1), 3),
+    humanExposureIndex: roundTo(humanExposure, 3),
+    nightLightIndex: roundTo(clamp(population ** 1.5, 0, 1), 3),
+    cloudOpacity: roundTo(clamp(0.18 + carbonPressure * 0.18 + population * 0.05, 0.14, 0.42), 3),
+    confidence: "observed",
+    projection: "equirectangular-wgs84",
+    summary:
+      "Derived from interpolated population, carbon, and wilderness metrics where no gridded Earth-state stop is available.",
+    sourceRefs
+  };
+}
+
+export function interpolateEarthSurface(
+  anchors: TimelineAnchor[],
+  year: number,
+  metrics = interpolateMetrics(anchors, year)
+): EarthSurfaceState {
+  const surfaceAnchors = sortTimelineAnchors(anchors).filter(
+    (anchor): anchor is TimelineAnchor & { earthSurface: EarthSurfaceState } =>
+      Boolean(anchor.earthSurface)
+  );
+
+  if (surfaceAnchors.length === 0) {
+    return deriveEarthSurfaceFromMetrics(metrics);
+  }
+
+  const first = surfaceAnchors[0];
+  const last = surfaceAnchors[surfaceAnchors.length - 1];
+
+  if (year <= first.year) {
+    return first.earthSurface;
+  }
+
+  if (year >= last.year) {
+    return {
+      ...deriveEarthSurfaceFromMetrics(metrics, last.earthSurface.sourceRefs),
+      confidence: last.earthSurface.confidence,
+      summary: last.earthSurface.summary
+    };
+  }
+
+  const nextIndex = surfaceAnchors.findIndex((anchor) => anchor.year >= year);
+  const previous = surfaceAnchors[nextIndex - 1];
+  const next = surfaceAnchors[nextIndex];
+
+  if (previous.year === next.year) {
+    return previous.earthSurface;
+  }
+
+  const progress = (year - previous.year) / (next.year - previous.year);
+  const surface: Record<string, number | string | SourceRef[]> = {
+    confidence: progress < 0.5 ? previous.earthSurface.confidence : next.earthSurface.confidence,
+    projection: "equirectangular-wgs84",
+    summary:
+      progress < 0.5 ? previous.earthSurface.summary : next.earthSurface.summary,
+    sourceRefs: uniqueSourceRefs([
+      ...previous.earthSurface.sourceRefs,
+      ...next.earthSurface.sourceRefs
+    ])
+  };
+
+  for (const key of earthSurfaceKeys) {
+    surface[key] = roundTo(
+      previous.earthSurface[key] +
+        (next.earthSurface[key] - previous.earthSurface[key]) * progress,
+      key.endsWith("Percent") ? 1 : 3
+    );
+  }
+
+  return surface as EarthSurfaceState;
+}
+
 export function createWorldSnapshot(
   anchors: TimelineAnchor[],
   year: number,
   layers: LayerState = defaultLayers
 ): WorldSnapshot {
   const metrics = interpolateMetrics(anchors, year);
+  const earthSurface = interpolateEarthSurface(anchors, year, metrics);
   const population = metrics.worldPopulationBillion ?? 0;
   const wildSpace = metrics.remainingWildSpacePercent ?? 50;
   const carbon = metrics.atmosphericCarbonPpm ?? 280;
@@ -138,10 +244,11 @@ export function createWorldSnapshot(
     year,
     metrics,
     layers,
+    earthSurface,
     proceduralDensity: {
-      trees: roundTo(clamp(wildFraction, 0.16, 0.95), 3),
-      buildings: roundTo(settlementPressure, 3),
-      waterStress: roundTo(carbonPressure, 3),
+      trees: roundTo(clamp(earthSurface.vegetationIndex, 0.12, 0.95), 3),
+      buildings: roundTo(clamp(earthSurface.humanExposureIndex || settlementPressure, 0.04, 1), 3),
+      waterStress: roundTo(clamp(earthSurface.weatherEnergyIndex || carbonPressure, 0, 1), 3),
       animalPresence: roundTo(clamp(wildFraction * (1 - carbonPressure * 0.35), 0.05, 1), 3)
     }
   };
@@ -233,6 +340,19 @@ export function validateMetricSourceRefs(anchors: TimelineAnchor[]) {
           : [`${anchor.id} metric:${metricKey} has no metric source references`];
       }
     );
+  });
+}
+
+function uniqueSourceRefs(sourceRefs: SourceRef[]) {
+  const seen = new Set<string>();
+
+  return sourceRefs.filter((sourceRef) => {
+    if (seen.has(sourceRef.id)) {
+      return false;
+    }
+
+    seen.add(sourceRef.id);
+    return true;
   });
 }
 

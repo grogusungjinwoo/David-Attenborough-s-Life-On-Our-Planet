@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   earthBasemapDescriptors,
   earthDomainWorkstreams,
+  earthTextureManifest,
   staticEarthProvider
 } from "./mapProviders";
 
@@ -39,5 +40,18 @@ describe("static Earth provider", () => {
       "oceania-australia",
       "oceans-islands"
     ]);
+  });
+
+  it("resolves bundled Earth textures through Vite asset URLs", () => {
+    const textureUrls = [
+      ...Object.values(earthTextureManifest.albedo),
+      ...Object.values(earthTextureManifest.normal)
+    ];
+
+    expect(textureUrls).toHaveLength(5);
+    for (const url of textureUrls) {
+      expect(url).toContain("earth-day-noclouds");
+      expect(url).not.toMatch(/^\/assets\//);
+    }
   });
 });

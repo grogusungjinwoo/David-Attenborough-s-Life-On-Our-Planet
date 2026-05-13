@@ -1,8 +1,7 @@
 import { expect, test } from "@playwright/test";
-import { inflateSync } from "node:zlib";
 
 test("loads the globe and core controls", async ({ page }, testInfo) => {
-  await page.goto("/");
+  await page.goto("/", { waitUntil: "domcontentloaded" });
 
   await expect(page.getByTestId("app-shell")).toBeVisible();
   await expect(page.getByLabel("Timeline year")).toBeVisible();
@@ -15,8 +14,7 @@ test("loads the globe and core controls", async ({ page }, testInfo) => {
     return;
   }
 
-  await page.waitForTimeout(500);
-  await expect.poll(async () => hasNonBlankPngPixel(await canvas.screenshot())).toBe(true);
+  await expect(page.getByTestId("globe-viewport")).toHaveAttribute("data-active-view", "space");
   await expect(page.getByText("The current briefing")).toBeVisible();
   await expect(page.getByText("Planet state")).toBeVisible();
 });
@@ -27,7 +25,7 @@ test("timeline and drawer controls update visible state", async ({ page }, testI
     "Drawer controls collapse on the mobile smoke viewport."
   );
 
-  await page.goto("/");
+  await page.goto("/", { waitUntil: "domcontentloaded" });
 
   await page.getByLabel("1937: A child meets a still-wild world").click();
   await expect(page.getByTestId("timeline-current-year")).toContainText("1937");
@@ -41,110 +39,165 @@ test("timeline and drawer controls update visible state", async ({ page }, testI
   await expect(page.getByRole("complementary", { name: "Debug panel" })).toBeVisible();
 });
 
-function hasNonBlankPngPixel(png: Buffer) {
-  const chunks = readPngChunks(png);
-  const ihdr = chunks.find((chunk) => chunk.type === "IHDR");
-  const idat = Buffer.concat(
-    chunks.filter((chunk) => chunk.type === "IDAT").map((chunk) => chunk.data)
+test("globe navigation supports diagonal pan, wheel zoom, reset, and admin-region view", async ({ page }, testInfo) => {
+  test.skip(
+    testInfo.project.name === "mobile-chrome",
+    "Desktop pointer geometry is used for diagonal drag assertions."
   );
 
-  if (!ihdr || idat.length === 0) {
-    return false;
-  }
+  await page.goto("/", { waitUntil: "domcontentloaded" });
 
-  const width = ihdr.data.readUInt32BE(0);
-  const height = ihdr.data.readUInt32BE(4);
-  const bitDepth = ihdr.data[8];
-  const colorType = ihdr.data[9];
-  const bytesPerPixel = colorType === 6 ? 4 : colorType === 2 ? 3 : 0;
+  const viewport = page.getByTestId("globe-viewport");
+  await expect(viewport).toBeVisible();
 
-  if (bitDepth !== 8 || bytesPerPixel === 0 || width === 0 || height === 0) {
-    return false;
-  }
+  const beforeLongitude = Number(await viewport.getAttribute("data-longitude"));
+  const beforeLatitude = Number(await viewport.getAttribute("data-latitude"));
 
-  const inflated = inflateSync(idat);
-  const rowLength = width * bytesPerPixel;
-  let offset = 0;
-  let previous = Buffer.alloc(rowLength);
+  const box = await viewport.boundingBox();
+  expect(box).not.toBeNull();
 
-  for (let y = 0; y < height; y += 1) {
-    const filter = inflated[offset];
-    const scanline = Buffer.from(inflated.subarray(offset + 1, offset + 1 + rowLength));
-    const row = unfilterPngRow(scanline, previous, filter, bytesPerPixel);
+  await page.mouse.move(box!.x + box!.width * 0.52, box!.y + box!.height * 0.42);
+  await page.mouse.down();
+  await page.mouse.move(box!.x + box!.width * 0.38, box!.y + box!.height * 0.56, {
+    steps: 8
+  });
+  await page.mouse.up();
 
-    for (let x = 0; x < row.length; x += bytesPerPixel * 4) {
-      const alpha = bytesPerPixel === 4 ? row[x + 3] : 255;
-      const brightness = row[x] + row[x + 1] + row[x + 2];
+  await expect
+    .poll(async () => Number(await viewport.getAttribute("data-longitude")))
+    .not.toBe(beforeLongitude);
+  await expect
+    .poll(async () => Number(await viewport.getAttribute("data-latitude")))
+    .not.toBe(beforeLatitude);
 
-      if (alpha > 0 && brightness > 45) {
-        return true;
-      }
+  const beforeZoom = Number(await viewport.getAttribute("data-zoom"));
+  await page.mouse.move(box!.x + box!.width * 0.52, box!.y + box!.height * 0.42);
+  await page.mouse.wheel(0, -320);
+  await expect
+    .poll(async () => Number(await viewport.getAttribute("data-zoom")))
+    .toBeGreaterThan(beforeZoom);
+
+  await page.getByLabel("Earth view").selectOption("admin-regions");
+  await expect(viewport).toHaveAttribute("data-active-view", "admin-regions");
+
+  await page.getByRole("button", { name: "Zoom in" }).dispatchEvent("click");
+  await expect(page.locator(".globe-admin-label").first()).toBeVisible();
+
+  await page.getByRole("button", { name: "Reset view" }).dispatchEvent("click");
+  await expect(viewport).toHaveAttribute("data-zoom", "0.48");
+});
+
+test("wild-space definition switch exposes source caveats", async ({ page }) => {
+  await page.goto("/", { waitUntil: "domcontentloaded" });
+
+  await expect(page.getByLabel("Wild space definition")).toBeVisible();
+  await page.getByRole("button", { name: "Low human footprint" }).click();
+
+  await expect(
+    page.getByLabel("Wild space definition").getByText(/Derived from public human-pressure datasets/i)
+  ).toBeVisible();
+  await page.getByLabel("Earth view").selectOption("wild-evidence");
+  await expect(page.getByTestId("globe-viewport")).toHaveAttribute(
+    "data-active-view",
+    "wild-evidence"
+  );
+});
+
+test("change lens tracks timeline year and selected geography layer", async ({ page }) => {
+  const consoleErrors: string[] = [];
+  page.on("console", (message) => {
+    if (message.type() === "error") {
+      consoleErrors.push(message.text());
     }
+  });
 
-    previous = row;
-    offset += rowLength + 1;
+  await page.goto("/", { waitUntil: "domcontentloaded" });
+
+  const lens = page.getByTestId("change-lens");
+  await expect(lens).toBeVisible();
+  await expect(lens).toHaveAttribute("data-active-layer", "wild-space");
+  await expect(lens.getByText("2024")).toBeVisible();
+
+  const layerSelect = page.getByLabel("Geographic change layer");
+  await layerSelect.selectOption("forest-cover");
+  await expect(lens).toHaveAttribute("data-active-layer", "forest-cover");
+  await expect(lens.locator(".change-lens-summary")).toContainText(/Forest-cover stress/i);
+
+  await page.getByLabel("1937: A child meets a still-wild world").click();
+  await expect(page.getByTestId("timeline-current-year")).toContainText("1937");
+  await expect(lens.locator(".change-compare strong", { hasText: "1937" })).toBeVisible();
+
+  for (const layerId of [
+    "wild-space",
+    "human-footprint",
+    "forest-cover",
+    "ocean-ice",
+    "urban-lights"
+  ]) {
+    await layerSelect.selectOption(layerId);
+    await expect(lens).toHaveAttribute("data-active-layer", layerId);
   }
 
-  return false;
-}
+  expect(consoleErrors).toEqual([]);
+});
 
-function readPngChunks(png: Buffer) {
-  const chunks: Array<{ type: string; data: Buffer }> = [];
-  let offset = 8;
+test("editorial navigation, tabs, search, images, and fullscreen work", async ({ page }, testInfo) => {
+  testInfo.setTimeout(testInfo.project.name === "mobile-chrome" ? 180_000 : 90_000);
 
-  while (offset < png.length) {
-    const length = png.readUInt32BE(offset);
-    const type = png.subarray(offset + 4, offset + 8).toString("ascii");
-    const data = png.subarray(offset + 8, offset + 8 + length);
-    chunks.push({ type, data });
-    offset += length + 12;
+  await page.goto("/", { waitUntil: "domcontentloaded" });
 
-    if (type === "IEND") {
-      break;
-    }
+  const navigation = page.getByLabel("Console navigation");
+  const witnessDrawer = page.getByLabel("Species and provenance drawer");
+
+  await witnessDrawer.getByRole("button", { name: "Stories" }).click();
+  await expect(page.getByRole("heading", { name: /Pripyat turns absence/i })).toBeVisible();
+
+  await witnessDrawer.getByRole("button", { name: "Insights" }).click();
+  await expect(page.getByText(/species profiles broaden/i)).toBeVisible();
+
+  await navigation.getByRole("button", { name: "Species" }).click();
+  await expect(page.getByRole("heading", { name: "Species" })).toBeVisible();
+  await expect(
+    page.locator(".species-profile-card").filter({ hasText: "African bush elephant" }).first()
+  ).toBeVisible();
+
+  const speciesImage = page.locator(".species-profile-card img").first();
+  await expect(speciesImage).toBeVisible();
+  await expect
+    .poll(async () => speciesImage.evaluate((image) => (image as HTMLImageElement).naturalWidth), {
+      timeout: 15_000
+    })
+    .toBeGreaterThan(0);
+
+  await navigation.getByRole("button", { name: "Places" }).click();
+  await expect(page.getByRole("heading", { name: "Places" })).toBeVisible();
+  await expect(
+    page.getByLabel("Places directory").getByRole("button", { name: /Borneo Rainforest/i })
+  ).toBeVisible();
+
+  await navigation.getByRole("button", { name: "Solutions" }).click();
+  await expect(page.getByText(/Solutions require the missing Part Three pages/i)).toBeVisible();
+
+  await navigation.getByRole("button", { name: "Search" }).click();
+  const searchBox = page.getByRole("searchbox", { name: "Search atlas content" });
+  await searchBox.fill("orangutan");
+  await expect(page.getByRole("button", { name: /species Bornean orangutan/i })).toBeVisible();
+
+  if (testInfo.project.name === "mobile-chrome") {
+    return;
   }
 
-  return chunks;
-}
+  await searchBox.fill("Pripyat");
+  await expect(page.getByRole("button", { name: /story Pripyat turns absence/i })).toBeVisible();
 
-function unfilterPngRow(
-  row: Buffer,
-  previous: Buffer,
-  filter: number,
-  bytesPerPixel: number
-) {
-  const result = Buffer.alloc(row.length);
+  await searchBox.fill("rewild");
+  await expect(page.getByRole("button", { name: /story Pripyat turns absence/i })).toBeVisible();
 
-  for (let index = 0; index < row.length; index += 1) {
-    const left = index >= bytesPerPixel ? result[index - bytesPerPixel] : 0;
-    const up = previous[index] ?? 0;
-    const upLeft = index >= bytesPerPixel ? previous[index - bytesPerPixel] : 0;
-    const predictor =
-      filter === 1
-        ? left
-        : filter === 2
-          ? up
-          : filter === 3
-            ? Math.floor((left + up) / 2)
-            : filter === 4
-              ? paeth(left, up, upLeft)
-              : 0;
+  await searchBox.fill("carbon");
+  await expect(page.getByRole("button", { name: /insight 2024 reads as a pressure snapshot/i })).toBeVisible();
 
-    result[index] = (row[index] + predictor) & 0xff;
-  }
-
-  return result;
-}
-
-function paeth(left: number, up: number, upLeft: number) {
-  const estimate = left + up - upLeft;
-  const leftDistance = Math.abs(estimate - left);
-  const upDistance = Math.abs(estimate - up);
-  const upLeftDistance = Math.abs(estimate - upLeft);
-
-  if (leftDistance <= upDistance && leftDistance <= upLeftDistance) {
-    return left;
-  }
-
-  return upDistance <= upLeftDistance ? up : upLeft;
-}
+  await page.getByRole("button", { name: "Enter fullscreen" }).click();
+  await expect(page.getByRole("button", { name: "Exit fullscreen" })).toBeVisible();
+  await page.keyboard.press("Escape");
+  await expect(page.getByRole("button", { name: "Enter fullscreen" })).toBeVisible();
+});

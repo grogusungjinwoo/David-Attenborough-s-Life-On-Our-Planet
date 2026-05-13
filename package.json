@@ -11,6 +11,11 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "test:e2e": "playwright test",
+    "test:visual-smoke": "node scripts/run-visual-smoke.mjs",
+    "verify:pages": "node scripts/verify-pages-parity.mjs",
+    "content:extract-manuscript": "python scripts/extract_manuscript.py \"C:\\\\Users\\\\patri\\\\Downloads\\\\9781529108279.pdf\"",
+    "content:verify-media": "node scripts/verify-media.mjs",
+    "content:verify-search": "node scripts/verify-search.mjs",
     "typecheck": "tsc -b"
   },
   "dependencies": {

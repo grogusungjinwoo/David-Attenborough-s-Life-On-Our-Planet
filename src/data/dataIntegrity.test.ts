@@ -1,6 +1,9 @@
 import { describe, expect, it } from "vitest";
 import {
   allSources,
+  editorialStories,
+  insightCards,
+  geoLayers,
   referenceOverlays,
   regions,
   speciesRecords,
@@ -12,6 +15,7 @@ import {
   validateMetricSourceRefs,
   validateSourceRefs
 } from "../domain/timeline";
+import { earthTextureManifest } from "../map/earthManifest";
 
 describe("seed data integrity", () => {
   it("keeps every timeline anchor source-backed", () => {
@@ -25,7 +29,10 @@ describe("seed data integrity", () => {
         ...regions,
         ...speciesRecords,
         ...zooSites,
-        ...referenceOverlays
+        ...referenceOverlays,
+        ...geoLayers,
+        ...editorialStories,
+        ...insightCards
       ])
     ).toEqual([]);
   });
@@ -36,7 +43,11 @@ describe("seed data integrity", () => {
       ...regions,
       ...speciesRecords,
       ...zooSites,
-      ...referenceOverlays
+      ...referenceOverlays,
+      ...geoLayers,
+      ...editorialStories,
+      ...insightCards,
+      earthTextureManifest
     ];
 
     expect(validateCatalogSourceRefs(records, allSources)).toEqual([]);
@@ -52,6 +63,23 @@ describe("seed data integrity", () => {
     const ids = allSources.map((source) => source.id);
 
     expect(new Set(ids).size).toBe(ids.length);
+  });
+
+  it("requires geo evidence layers to carry caveats and evidence kinds", () => {
+    for (const layer of geoLayers) {
+      expect(layer.evidenceKind).toMatch(
+        /narrative-metric|measured-global-stat|derived-raster-stat|licensed-polygon|simulated-visual/
+      );
+      expect(layer.displayCaveat.length).toBeGreaterThan(20);
+      expect(layer.definition.length).toBeGreaterThan(20);
+      expect(layer.sourceRefs.length).toBeGreaterThan(0);
+    }
+  });
+
+  it("keeps Earth texture manifest source-backed and tiered", () => {
+    expect(earthTextureManifest.albedo.mobile).toContain("earth-day");
+    expect(earthTextureManifest.albedo.desktop).toContain("earth-day");
+    expect(earthTextureManifest.sourceRefs.length).toBeGreaterThanOrEqual(3);
   });
 
   it("binds species only to known regions", () => {

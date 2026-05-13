@@ -1,4 +1,5 @@
 import { sourceCatalog } from "../data/sources";
+import type { EarthTextureManifest } from "../domain/types";
 
 export type EarthBasemapId = "satellite" | "topographic" | "political";
 
@@ -174,3 +175,29 @@ export const staticEarthManifest = {
   basemaps: earthBasemapDescriptors,
   workstreams: earthDomainWorkstreams
 } as const;
+
+const earthDayTextureUrl = new URL("../assets/earth/earth-day-noclouds.jpg", import.meta.url).href;
+
+export const earthTextureManifest = {
+  id: "open-earth-textures-v1",
+  label: "Open Earth texture set",
+  projection: "equirectangular-wgs84",
+  lonRange: [-180, 180],
+  latRange: [-90, 90],
+  seamLongitude: 180,
+  centralMeridian: 0,
+  albedo: {
+    mobile: earthDayTextureUrl,
+    desktop: earthDayTextureUrl,
+    high: earthDayTextureUrl
+  },
+  normal: {
+    desktop: earthDayTextureUrl,
+    high: earthDayTextureUrl
+  },
+  sourceRefs: [
+    sourceCatalog.nasaBlueMarble,
+    sourceCatalog.noaaEtopo,
+    sourceCatalog.naturalEarth
+  ]
+} satisfies EarthTextureManifest;
