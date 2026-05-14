@@ -30,10 +30,14 @@ describe("editorial content layer", () => {
     expect(solutionSourceStatus.blocked).toBe(true);
   });
 
-  it("keeps media metadata commercial-compatible and local", () => {
-    expect(mediaAssets.length).toBeGreaterThanOrEqual(18);
+  it("keeps media metadata commercial-compatible and source-backed", () => {
+    const wikimediaAssets = mediaAssets.filter((asset) => asset.kind !== "earth");
+    const earthReferenceAssets = mediaAssets.filter((asset) => asset.kind === "earth");
 
-    for (const asset of mediaAssets) {
+    expect(wikimediaAssets.length).toBeGreaterThanOrEqual(18);
+    expect(earthReferenceAssets.length).toBeGreaterThanOrEqual(2);
+
+    for (const asset of wikimediaAssets) {
       expect(asset.commercialUseCompatible).toBe(true);
       expect(asset.attribution.length).toBeGreaterThan(8);
       expect(asset.placeholderStatus).toBe("available");
@@ -42,6 +46,14 @@ describe("editorial content layer", () => {
       expect(asset.sourceUrl).toMatch(/^https:\/\/commons\.wikimedia\.org\//);
       expect(asset.licenseUrl).toMatch(/^https?:\/\//);
       expect(asset.sourceRefs.length).toBeGreaterThan(0);
+    }
+
+    for (const asset of earthReferenceAssets) {
+      expect(asset.commercialUseCompatible).toBe(true);
+      expect(asset.placeholderStatus).toBe("available");
+      expect(asset.sourceUrl).toMatch(/^https:\/\/www\.nasa\.gov\//);
+      expect(asset.sourceRefs.some((source) => source.publisher === "NASA")).toBe(true);
+      expect(asset.notes).toMatch(/space-view reference|not a literal photograph/i);
     }
 
     expect(

@@ -26,6 +26,12 @@ export type ZoomIntent = "idle" | "in" | "out" | "reset";
 export type EarthView = GlobeActiveView;
 export type EarthViewMode = "globe3d" | "map2d";
 export type EarthBasemap = "satellite" | "topographic" | "political";
+export type ScrollMode = "narrative" | "manual";
+export type GlobeViewTarget = {
+  lat: number;
+  lon: number;
+  zoomScalar: number;
+};
 
 export type MapViewport = {
   zoom: number;
@@ -40,6 +46,8 @@ export type PlanetAction =
   | { type: "layerToggled"; layer: PlanetLayerKey }
   | { type: "layerSet"; layer: PlanetLayerKey; enabled: boolean }
   | { type: "activeViewSelected"; activeView: GlobeActiveView }
+  | { type: "viewModeSelected"; viewMode: EarthViewMode }
+  | { type: "earthBasemapSelected"; basemap: EarthBasemap }
   | { type: "geoChangeLayerSelected"; layerId: GeoChangeLayerId }
   | { type: "qualitySelected"; quality: GlobeQuality }
   | { type: "wildSpaceDefinitionSelected"; definition: WildSpaceDefinition }
@@ -50,6 +58,15 @@ export type PlanetAction =
   | { type: "globePanned"; longitudeDeltaDeg: number; latitudeDeltaDeg: number }
   | { type: "globeZoomed"; delta: number }
   | { type: "zoomed"; intent: Exclude<ZoomIntent, "idle"> }
+  | { type: "scrollModeSelected"; mode: ScrollMode }
+  | {
+      type: "scrollChapterSelected";
+      chapterId: string;
+      year: number;
+      target: GlobeViewTarget;
+      activeLayerIds?: PlanetLayerKey[];
+    }
+  | { type: "globeViewTargetSelected"; target: GlobeViewTarget }
   | { type: "debugToggled" };
 
 export type PlanetActions = {
@@ -60,6 +77,8 @@ export type PlanetActions = {
   toggleLayer: (layer: PlanetLayerKey) => void;
   setLayer: (layer: PlanetLayerKey, enabled: boolean) => void;
   setActiveView: (activeView: GlobeActiveView) => void;
+  setViewMode: (viewMode: EarthViewMode) => void;
+  setEarthBasemap: (basemap: EarthBasemap) => void;
   setActiveGeoChangeLayer: (layerId: GeoChangeLayerId) => void;
   setEarthView: (earthView: EarthView) => void;
   setQuality: (quality: GlobeQuality) => void;
@@ -73,6 +92,14 @@ export type PlanetActions = {
   zoomIn: () => void;
   zoomOut: () => void;
   resetView: () => void;
+  setScrollMode: (mode: ScrollMode) => void;
+  setScrollChapter: (
+    chapterId: string,
+    year: number,
+    target: GlobeViewTarget,
+    activeLayerIds?: PlanetLayerKey[]
+  ) => void;
+  setGlobeViewTarget: (target: GlobeViewTarget) => void;
   toggleDebug: () => void;
 };
 
@@ -99,6 +126,8 @@ export type PlanetState = {
   snapshot: WorldSnapshot;
   zoomIntent: ZoomIntent;
   zoomScalar: number;
+  scrollMode: ScrollMode;
+  activeScrollChapterId?: string;
   debugOpen: boolean;
   actions: PlanetActions;
   dispatch: (action: PlanetAction) => void;
@@ -109,6 +138,8 @@ export type PlanetState = {
   toggleLayer: (layer: PlanetLayerKey) => void;
   setLayer: (layer: PlanetLayerKey, enabled: boolean) => void;
   setActiveView: (activeView: GlobeActiveView) => void;
+  setViewMode: (viewMode: EarthViewMode) => void;
+  setEarthBasemap: (basemap: EarthBasemap) => void;
   setActiveGeoChangeLayer: (layerId: GeoChangeLayerId) => void;
   setEarthView: (earthView: EarthView) => void;
   setQuality: (quality: GlobeQuality) => void;
@@ -122,6 +153,14 @@ export type PlanetState = {
   zoomIn: () => void;
   zoomOut: () => void;
   resetView: () => void;
+  setScrollMode: (mode: ScrollMode) => void;
+  setScrollChapter: (
+    chapterId: string,
+    year: number,
+    target: GlobeViewTarget,
+    activeLayerIds?: PlanetLayerKey[]
+  ) => void;
+  setGlobeViewTarget: (target: GlobeViewTarget) => void;
   toggleDebug: () => void;
 };
 
@@ -238,6 +277,7 @@ function reducePlanetState(
       return {
         selectedYear,
         currentYear: selectedYear,
+        scrollMode: "manual",
         snapshot: deriveSnapshot(selectedYear, state.layerToggles)
       };
     }
@@ -245,29 +285,50 @@ function reducePlanetState(
       return {
         selectedRegionId: action.regionId,
         selectedSpeciesId: undefined,
-        selectedZooId: undefined
+        selectedZooId: undefined,
+        scrollMode: "manual"
       };
     case "speciesSelected":
       return {
         selectedSpeciesId:
           state.selectedSpeciesId === action.speciesId ? undefined : action.speciesId,
-        selectedZooId: undefined
+        selectedRegionId: undefined,
+        selectedZooId: undefined,
+        scrollMode: "manual"
       };
     case "zooSelected":
       return {
         selectedZooId: state.selectedZooId === action.zooId ? undefined : action.zooId,
-        selectedSpeciesId: undefined
+        selectedRegionId: undefined,
+        selectedSpeciesId: undefined,
+        scrollMode: "manual"
       };
     case "layerToggled":
-      return layerUpdate(
+      return {
+        ...layerUpdate(
         state,
         action.layer,
         !((state.layers as Record<PlanetLayerKey, boolean>)[action.layer] ?? false)
-      );
+        ),
+        scrollMode: "manual"
+      };
     case "layerSet":
-      return layerUpdate(state, action.layer, action.enabled);
+      return {
+        ...layerUpdate(state, action.layer, action.enabled),
+        scrollMode: "manual"
+      };
     case "activeViewSelected":
       return activeViewLayerUpdate(state, action.activeView);
+    case "viewModeSelected":
+      return {
+        viewMode: action.viewMode,
+        scrollMode: "manual"
+      };
+    case "earthBasemapSelected":
+      return {
+        earthBasemap: action.basemap,
+        scrollMode: "manual"
+      };
     case "geoChangeLayerSelected":
       return {
         activeGeoChangeLayer: action.layerId
@@ -301,10 +362,12 @@ function reducePlanetState(
     case "searchQueryChanged":
       return {
         searchQuery: action.query,
+        scrollMode: "manual",
         activePrimarySection: action.query.trim() ? "search" : state.activePrimarySection
       };
     case "globePanned":
       return {
+        scrollMode: "manual",
         globeView: {
           ...state.globeView,
           longitudeDeg: wrapLongitude(state.globeView.longitudeDeg + action.longitudeDeltaDeg),
@@ -315,6 +378,7 @@ function reducePlanetState(
       const zoomScalar = clamp(state.globeView.zoomScalar + action.delta, 0, 1);
 
       return {
+        scrollMode: "manual",
         zoomScalar,
         globeView: {
           ...state.globeView,
@@ -326,6 +390,7 @@ function reducePlanetState(
       if (action.intent === "reset") {
         return {
           zoomIntent: action.intent,
+          scrollMode: "manual",
           zoomScalar: initialZoomScalar,
           globeView: {
             ...initialGlobeView,
@@ -345,6 +410,7 @@ function reducePlanetState(
 
         return {
           zoomIntent: action.intent,
+          scrollMode: "manual",
           zoomScalar,
           globeView: {
             ...state.globeView,
@@ -360,6 +426,50 @@ function reducePlanetState(
           }
         };
       }
+    case "scrollModeSelected":
+      return { scrollMode: action.mode };
+    case "globeViewTargetSelected": {
+      const zoomScalar = clamp(action.target.zoomScalar, 0, 1);
+
+      return {
+        scrollMode: "manual",
+        zoomScalar,
+        globeView: {
+          ...state.globeView,
+          latitudeDeg: clampLatitude(action.target.lat),
+          longitudeDeg: wrapLongitude(action.target.lon),
+          zoomScalar
+        }
+      };
+    }
+    case "scrollChapterSelected": {
+      const selectedYear = Math.round(action.year);
+      const zoomScalar = clamp(action.target.zoomScalar, 0, 1);
+      let layers = state.layers;
+
+      for (const layerId of action.activeLayerIds ?? []) {
+        layers = withLayerValue(layers, layerId, true);
+      }
+
+      const layerToggles = pickStoryLayers(layers);
+
+      return {
+        selectedYear,
+        currentYear: selectedYear,
+        activeScrollChapterId: action.chapterId,
+        scrollMode: "narrative",
+        zoomScalar,
+        layers,
+        layerToggles,
+        snapshot: deriveSnapshot(selectedYear, layerToggles),
+        globeView: {
+          ...state.globeView,
+          latitudeDeg: clampLatitude(action.target.lat),
+          longitudeDeg: wrapLongitude(action.target.lon),
+          zoomScalar
+        }
+      };
+    }
     case "debugToggled":
       return { debugOpen: !state.debugOpen };
   }
@@ -379,6 +489,8 @@ export const usePlanetStore = create<PlanetState>((set) => {
     toggleLayer: (layer) => dispatch({ type: "layerToggled", layer }),
     setLayer: (layer, enabled) => dispatch({ type: "layerSet", layer, enabled }),
     setActiveView: (activeView) => dispatch({ type: "activeViewSelected", activeView }),
+    setViewMode: (viewMode) => dispatch({ type: "viewModeSelected", viewMode }),
+    setEarthBasemap: (basemap) => dispatch({ type: "earthBasemapSelected", basemap }),
     setActiveGeoChangeLayer: (layerId) =>
       dispatch({ type: "geoChangeLayerSelected", layerId }),
     setEarthView: (earthView) => dispatch({ type: "activeViewSelected", activeView: earthView }),
@@ -397,6 +509,10 @@ export const usePlanetStore = create<PlanetState>((set) => {
     zoomIn: () => dispatch({ type: "zoomed", intent: "in" }),
     zoomOut: () => dispatch({ type: "zoomed", intent: "out" }),
     resetView: () => dispatch({ type: "zoomed", intent: "reset" }),
+    setScrollMode: (mode) => dispatch({ type: "scrollModeSelected", mode }),
+    setScrollChapter: (chapterId, year, target, activeLayerIds) =>
+      dispatch({ type: "scrollChapterSelected", chapterId, year, target, activeLayerIds }),
+    setGlobeViewTarget: (target) => dispatch({ type: "globeViewTargetSelected", target }),
     toggleDebug: () => dispatch({ type: "debugToggled" })
   };
 
@@ -423,6 +539,8 @@ export const usePlanetStore = create<PlanetState>((set) => {
     snapshot: deriveSnapshot(initialYear, layerToggles),
     zoomIntent: "idle",
     zoomScalar: initialZoomScalar,
+    scrollMode: "narrative",
+    activeScrollChapterId: undefined,
     debugOpen: false,
     actions,
     dispatch,
@@ -433,6 +551,8 @@ export const usePlanetStore = create<PlanetState>((set) => {
     toggleLayer: actions.toggleLayer,
     setLayer: actions.setLayer,
     setActiveView: actions.setActiveView,
+    setViewMode: actions.setViewMode,
+    setEarthBasemap: actions.setEarthBasemap,
     setActiveGeoChangeLayer: actions.setActiveGeoChangeLayer,
     setEarthView: actions.setEarthView,
     setQuality: actions.setQuality,
@@ -446,6 +566,9 @@ export const usePlanetStore = create<PlanetState>((set) => {
     zoomIn: actions.zoomIn,
     zoomOut: actions.zoomOut,
     resetView: actions.resetView,
+    setScrollMode: actions.setScrollMode,
+    setScrollChapter: actions.setScrollChapter,
+    setGlobeViewTarget: actions.setGlobeViewTarget,
     toggleDebug: actions.toggleDebug
   };
 });

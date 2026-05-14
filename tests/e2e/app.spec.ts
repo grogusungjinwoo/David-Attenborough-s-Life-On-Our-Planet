@@ -1,11 +1,18 @@
-import { expect, test } from "@playwright/test";
+import { expect, test, type Page } from "@playwright/test";
+
+async function revealGlobeControls(page: Page) {
+  const showControls = page.getByRole("button", { name: "Show globe controls" });
+
+  if (await showControls.count()) {
+    await showControls.click();
+  }
+}
 
 test("loads the globe and core controls", async ({ page }, testInfo) => {
   await page.goto("/", { waitUntil: "domcontentloaded" });
 
   await expect(page.getByTestId("app-shell")).toBeVisible();
-  await expect(page.getByLabel("Timeline year")).toBeVisible();
-  await expect(page.getByLabel("Layer controls")).toBeVisible();
+  await expect(page.getByRole("button", { name: "Show globe controls" })).toBeVisible();
 
   const canvas = page.locator("canvas").first();
   await expect(canvas).toBeVisible();
@@ -15,8 +22,16 @@ test("loads the globe and core controls", async ({ page }, testInfo) => {
   }
 
   await expect(page.getByTestId("globe-viewport")).toHaveAttribute("data-active-view", "space");
-  await expect(page.getByText("The current briefing")).toBeVisible();
-  await expect(page.getByText("Planet state")).toBeVisible();
+  await revealGlobeControls(page);
+  await expect(page.getByLabel("Timeline year")).toBeVisible();
+  await expect(page.getByLabel("Layer controls")).toBeVisible();
+  await expect(
+    page.getByTestId("scroll-chapter-briefing-2024").getByRole("heading", {
+      name: "The current briefing"
+    })
+  ).toBeVisible();
+  await expect(page.getByTestId("atlas-control-drawer")).toBeVisible();
+  await expect(page.getByTestId("change-lens")).toBeVisible();
 });
 
 test("timeline and drawer controls update visible state", async ({ page }, testInfo) => {
@@ -26,17 +41,85 @@ test("timeline and drawer controls update visible state", async ({ page }, testI
   );
 
   await page.goto("/", { waitUntil: "domcontentloaded" });
+  await revealGlobeControls(page);
 
   await page.getByLabel("1937: A child meets a still-wild world").click();
   await expect(page.getByTestId("timeline-current-year")).toContainText("1937");
-  await expect(page.getByText("A child meets a still-wild world")).toBeVisible();
+  await expect(
+    page.getByTestId("scroll-chapter-childhood-1937").getByRole("heading", {
+      name: "A child meets a still-wild world"
+    })
+  ).toBeVisible();
 
-  await page.getByRole("button", { name: /Bornean orangutan/i }).click();
-  await expect(page.getByRole("heading", { name: "Bornean orangutan" })).toBeVisible();
+  await page
+    .getByTestId("scroll-chapter-childhood-1937")
+    .getByRole("button", { name: /Select African bush elephant/i })
+    .click();
+  await expect(page.getByRole("heading", { name: "African bush elephant" })).toBeVisible();
 
   await page.getByRole("button", { name: "Zoom in" }).click();
   await page.getByRole("button", { name: "Toggle debug panel" }).click();
   await expect(page.getByRole("complementary", { name: "Debug panel" })).toBeVisible();
+});
+
+test("desktop atlas scrolls the narrative rail while the globe stays pinned", async ({
+  page
+}, testInfo) => {
+  test.skip(
+    testInfo.project.name === "mobile-chrome",
+    "The pinned two-column atlas shell is a desktop layout."
+  );
+
+  await page.setViewportSize({ width: 1334, height: 914 });
+  await page.goto("/", { waitUntil: "domcontentloaded" });
+  await revealGlobeControls(page);
+
+  const rail = page.getByRole("region", { name: "Time scroll narrative" });
+  const stage = page.getByLabel("Scroll-driven globe atlas");
+  const stageBefore = await stage.boundingBox();
+
+  expect(stageBefore).not.toBeNull();
+  await expect(page.getByTestId("globe-viewport")).toBeVisible();
+
+  await rail.evaluate((element) => {
+    const target = element.querySelector(
+      '[data-testid="scroll-chapter-childhood-1937"]'
+    ) as HTMLElement | null;
+
+    element.scrollTo({ top: target?.offsetTop ?? 0, behavior: "auto" });
+  });
+
+  await expect(page.getByTestId("timeline-current-year")).toContainText("1937");
+  await expect
+    .poll(async () => page.evaluate(() => window.scrollY))
+    .toBe(0);
+  await expect
+    .poll(async () => rail.evaluate((element) => element.scrollTop))
+    .toBeGreaterThan(0);
+
+  const stageAfter = await stage.boundingBox();
+  expect(Math.round(stageAfter?.y ?? -1)).toBe(Math.round(stageBefore!.y));
+  expect(stageAfter?.height ?? 0).toBeGreaterThan(850);
+});
+
+test("tablet atlas avoids horizontal overflow and keeps the globe usable", async ({
+  page
+}, testInfo) => {
+  test.skip(
+    testInfo.project.name === "mobile-chrome",
+    "This regression targets the narrow desktop/tablet breakpoint."
+  );
+
+  await page.setViewportSize({ width: 871, height: 798 });
+  await page.goto("/", { waitUntil: "domcontentloaded" });
+  await revealGlobeControls(page);
+
+  await expect(page.getByTestId("globe-viewport")).toBeVisible();
+  await expect(page.getByLabel("Timeline year")).toBeVisible();
+  await expect(page.getByTestId("atlas-control-drawer")).toBeVisible();
+
+  const overflow = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
+  expect(overflow).toBeLessThanOrEqual(1);
 });
 
 test("globe navigation supports diagonal pan, wheel zoom, reset, and admin-region view", async ({ page }, testInfo) => {
@@ -46,6 +129,7 @@ test("globe navigation supports diagonal pan, wheel zoom, reset, and admin-regio
   );
 
   await page.goto("/", { waitUntil: "domcontentloaded" });
+  await revealGlobeControls(page);
 
   const viewport = page.getByTestId("globe-viewport");
   await expect(viewport).toBeVisible();
@@ -81,7 +165,8 @@ test("globe navigation supports diagonal pan, wheel zoom, reset, and admin-regio
   await expect(viewport).toHaveAttribute("data-active-view", "admin-regions");
 
   await page.getByRole("button", { name: "Zoom in" }).dispatchEvent("click");
-  await expect(page.locator(".globe-admin-label").first()).toBeVisible();
+  await page.getByRole("button", { name: "Zoom in" }).dispatchEvent("click");
+  await expect.poll(async () => page.locator(".globe-admin-label").count()).toBeGreaterThan(0);
 
   await page.getByRole("button", { name: "Reset view" }).dispatchEvent("click");
   await expect(viewport).toHaveAttribute("data-zoom", "0.48");
@@ -89,6 +174,7 @@ test("globe navigation supports diagonal pan, wheel zoom, reset, and admin-regio
 
 test("wild-space definition switch exposes source caveats", async ({ page }) => {
   await page.goto("/", { waitUntil: "domcontentloaded" });
+  await revealGlobeControls(page);
 
   await expect(page.getByLabel("Wild space definition")).toBeVisible();
   await page.getByRole("button", { name: "Low human footprint" }).click();
@@ -112,11 +198,12 @@ test("change lens tracks timeline year and selected geography layer", async ({ p
   });
 
   await page.goto("/", { waitUntil: "domcontentloaded" });
+  await revealGlobeControls(page);
 
   const lens = page.getByTestId("change-lens");
   await expect(lens).toBeVisible();
   await expect(lens).toHaveAttribute("data-active-layer", "wild-space");
-  await expect(lens.getByText("2024")).toBeVisible();
+  await expect(page.getByTestId("timeline-current-year")).toContainText("2024");
 
   const layerSelect = page.getByLabel("Geographic change layer");
   await layerSelect.selectOption("forest-cover");
@@ -125,7 +212,7 @@ test("change lens tracks timeline year and selected geography layer", async ({ p
 
   await page.getByLabel("1937: A child meets a still-wild world").click();
   await expect(page.getByTestId("timeline-current-year")).toContainText("1937");
-  await expect(lens.locator(".change-compare strong", { hasText: "1937" })).toBeVisible();
+  await expect(lens.locator(".change-compare strong")).toContainText("1937");
 
   for (const layerId of [
     "wild-space",
@@ -145,6 +232,7 @@ test("editorial navigation, tabs, search, images, and fullscreen work", async ({
   testInfo.setTimeout(testInfo.project.name === "mobile-chrome" ? 180_000 : 90_000);
 
   await page.goto("/", { waitUntil: "domcontentloaded" });
+  await revealGlobeControls(page);
 
   const navigation = page.getByLabel("Console navigation");
   const witnessDrawer = page.getByLabel("Species and provenance drawer");
@@ -193,6 +281,8 @@ test("editorial navigation, tabs, search, images, and fullscreen work", async ({
   await searchBox.fill("rewild");
   await expect(page.getByRole("button", { name: /story Pripyat turns absence/i })).toBeVisible();
 
+  await page.getByLabel("2024: The current briefing").click();
+  await expect(page.getByTestId("timeline-current-year")).toContainText("2024");
   await searchBox.fill("carbon");
   await expect(page.getByRole("button", { name: /insight 2024 reads as a pressure snapshot/i })).toBeVisible();
 

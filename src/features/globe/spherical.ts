@@ -3,6 +3,13 @@ import type { GlobeViewState } from "../../domain/types";
 
 const DEG_TO_RAD = Math.PI / 180;
 
+export const GLOBE_ROOT_ROTATION = [0, 0, 0] as const;
+
+export const EARTH_TEXTURE_ALIGNMENT = {
+  longitudeOffsetDeg: 0,
+  flipX: false
+} as const;
+
 export type SurfacePoint = {
   id: string;
   lat: number;
@@ -10,6 +17,8 @@ export type SurfacePoint = {
   scale: number;
   color?: string;
 };
+
+export type LonLat = [number, number];
 
 export function latLonToVector3(lat: number, lon: number, radius = 1) {
   const phi = (90 - lat) * DEG_TO_RAD;
@@ -22,6 +31,37 @@ export function latLonToVector3(lat: number, lon: number, radius = 1) {
   );
 }
 
+export function greatCircleArc(
+  start: LonLat,
+  end: LonLat,
+  segments = 32,
+  radius = 1
+) {
+  const pointCount = Math.max(2, Math.round(segments));
+  const startVector = latLonToVector3(start[1], start[0], 1).normalize();
+  const endVector = latLonToVector3(end[1], end[0], 1).normalize();
+  const angle = startVector.angleTo(endVector);
+
+  if (angle === 0) {
+    return Array.from({ length: pointCount }, () => startVector.clone().multiplyScalar(radius));
+  }
+
+  const sinAngle = Math.sin(angle);
+
+  return Array.from({ length: pointCount }, (_, index) => {
+    const t = index / (pointCount - 1);
+    const startWeight = Math.sin((1 - t) * angle) / sinAngle;
+    const endWeight = Math.sin(t * angle) / sinAngle;
+
+    return startVector
+      .clone()
+      .multiplyScalar(startWeight)
+      .add(endVector.clone().multiplyScalar(endWeight))
+      .normalize()
+      .multiplyScalar(radius);
+  });
+}
+
 export function clampLatitude(latitudeDeg: number) {
   return clamp(latitudeDeg, -82, 82);
 }
@@ -31,7 +71,8 @@ export function wrapLongitude(longitudeDeg: number) {
 }
 
 export function globeViewToCameraPosition(view: GlobeViewState) {
-  const distance = 3.85 - view.zoomScalar * 1.55;
+  const zoom = clamp(view.zoomScalar, 0, 1);
+  const distance = 5.2 - Math.pow(zoom, 1.8) * 2.2;
 
   return latLonToVector3(clampLatitude(view.latitudeDeg), view.longitudeDeg, distance);
 }

@@ -14,6 +14,7 @@ test("globe detail overhaul is wired end to end", async ({ page }, testInfo) => 
   });
 
   await page.goto("/", { waitUntil: "domcontentloaded" });
+  await revealGlobeControls(page);
 
   const viewport = page.getByTestId("globe-viewport");
   const canvas = page.locator("canvas").first();
@@ -67,7 +68,8 @@ test("globe detail overhaul is wired end to end", async ({ page }, testInfo) => 
     "true"
   );
   await page.getByRole("button", { name: "Zoom in" }).dispatchEvent("click");
-  await expect(page.locator(".globe-admin-label").first()).toBeVisible();
+  await page.getByRole("button", { name: "Zoom in" }).dispatchEvent("click");
+  await expect.poll(async () => page.locator(".globe-admin-label").count()).toBeGreaterThan(0);
 
   await page.getByRole("button", { name: "Low human footprint" }).click();
   await expect(
@@ -84,7 +86,7 @@ test("globe detail overhaul is wired end to end", async ({ page }, testInfo) => 
 
   await page.getByLabel("1937: A child meets a still-wild world").click();
   await expect(page.getByTestId("timeline-current-year")).toContainText("1937");
-  await expect(lens.locator(".change-compare strong", { hasText: "1937" })).toBeVisible();
+  await expect(lens.locator(".change-compare strong")).toContainText("1937");
 
   const evidenceBadges = page
     .getByLabel("Species and provenance drawer")
@@ -95,6 +97,14 @@ test("globe detail overhaul is wired end to end", async ({ page }, testInfo) => 
 
   expect(consoleErrors).toEqual([]);
 });
+
+async function revealGlobeControls(page: import("@playwright/test").Page) {
+  const showControls = page.getByRole("button", { name: "Show globe controls" });
+
+  if (await showControls.count()) {
+    await showControls.click();
+  }
+}
 
 function isIgnorableDevServerConsoleMessage(message: string) {
   return /WebSocket connection to 'ws:\/\/127\.0\.0\.1:\d+\/' failed: Error in connection establishment: net::ERR_NETWORK_IO_SUSPENDED/i.test(

@@ -133,4 +133,54 @@ describe("usePlanetStore Earth view modes", () => {
     expect(usePlanetStore.getState().searchQuery).toBe("orangutan");
     expect(usePlanetStore.getState().activePrimarySection).toBe("search");
   });
+
+  it("tracks scroll atlas chapter state and applies chapter camera targets", () => {
+    const state = usePlanetStore.getState();
+
+    state.setScrollChapter("trade-1900", 1900, {
+      lat: 22,
+      lon: 35,
+      zoomScalar: 0.58
+    });
+
+    const chapterState = usePlanetStore.getState();
+
+    expect(chapterState.scrollMode).toBe("narrative");
+    expect(chapterState.activeScrollChapterId).toBe("trade-1900");
+    expect(chapterState.currentYear).toBe(1900);
+    expect(chapterState.globeView.latitudeDeg).toBe(22);
+    expect(chapterState.globeView.longitudeDeg).toBe(35);
+    expect(chapterState.globeView.zoomScalar).toBe(0.58);
+
+    chapterState.setScrollMode("manual");
+
+    expect(usePlanetStore.getState().scrollMode).toBe("manual");
+  });
+
+  it("applies explicit globe view targets for selected story and search items", () => {
+    const state = usePlanetStore.getState();
+
+    state.setGlobeViewTarget({ lat: -2.3, lon: 34.8, zoomScalar: 0.78 });
+
+    const targetState = usePlanetStore.getState();
+
+    expect(targetState.globeView.latitudeDeg).toBe(-2.3);
+    expect(targetState.globeView.longitudeDeg).toBeCloseTo(34.8);
+    expect(targetState.globeView.zoomScalar).toBe(0.78);
+    expect(targetState.scrollMode).toBe("manual");
+  });
+
+  it("switches between globe and 2D map mode with basemap selection", () => {
+    const state = usePlanetStore.getState();
+
+    state.setViewMode("map2d");
+    state.setEarthBasemap("political");
+
+    expect(usePlanetStore.getState().viewMode).toBe("map2d");
+    expect(usePlanetStore.getState().earthBasemap).toBe("political");
+
+    usePlanetStore.getState().setViewMode("globe3d");
+
+    expect(usePlanetStore.getState().viewMode).toBe("globe3d");
+  });
 });

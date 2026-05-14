@@ -25,6 +25,7 @@ test.describe("planned globe smoke flow", () => {
     );
 
     await page.goto("/");
+    await revealGlobeControls(page);
   });
 
   test("loads the app shell", async ({ page }) => {
@@ -84,6 +85,14 @@ test.describe("planned globe smoke flow", () => {
     await expect(page.getByTestId(testIds.sourceSection)).toBeVisible();
   });
 });
+
+async function revealGlobeControls(page: import("@playwright/test").Page) {
+  const showControls = page.getByRole("button", { name: "Show globe controls" });
+
+  if (await showControls.count()) {
+    await showControls.click();
+  }
+}
 
 async function expectCanvasElement(locator: Locator) {
   const hasCanvas = await locator.evaluate((element) => {

@@ -10,6 +10,15 @@ export type SourceRef = {
   detail?: string;
 };
 
+export type ContinentId =
+  | "africa"
+  | "antarctica"
+  | "asia"
+  | "europe"
+  | "north-america"
+  | "south-america"
+  | "oceania";
+
 export type LayerState = {
   atmosphere: boolean;
   vegetation: boolean;
@@ -197,7 +206,7 @@ export type MediaPlaceholderStatus = "available" | "unavailable" | "metadata-onl
 export type MediaAsset = {
   id: string;
   title: string;
-  kind: "portrait" | "place" | "species" | "habitat" | "document";
+  kind: "portrait" | "place" | "species" | "habitat" | "document" | "earth";
   subjectId: string;
   requiredForDisplay: boolean;
   placeholderStatus: MediaPlaceholderStatus;
@@ -257,6 +266,80 @@ export type RegionRecord = {
     | "mixed";
   summary: string;
   sourceRefs: SourceRef[];
+};
+
+export type CountryRecord = {
+  id: string;
+  isoA2: string;
+  isoA3: string;
+  name: string;
+  continentId: ContinentId;
+  labelLat: number;
+  labelLon: number;
+  bbox: [number, number, number, number];
+  importanceRank: number;
+  sourceRefs: SourceRef[];
+};
+
+export type ContinentRecord = {
+  id: ContinentId;
+  name: string;
+  labelLat: number;
+  labelLon: number;
+  bbox: [number, number, number, number];
+  sourceRefs: SourceRef[];
+};
+
+export type WildAreaRecord = {
+  id: string;
+  label: string;
+  lat: number;
+  lon: number;
+  radiusKm: number;
+  biome: RegionRecord["biome"];
+  firstVisibleYear: number;
+  sourceRefs: SourceRef[];
+};
+
+export type TradeRouteRecord = {
+  id: string;
+  label: string;
+  start: { label: string; lat: number; lon: number };
+  end: { label: string; lat: number; lon: number };
+  firstYear: number;
+  peakYear: number;
+  category: "steamship" | "oil" | "grain" | "container" | "air" | "digital";
+  intensityByYear: Array<{ year: number; intensity: number }>;
+  sourceRefs: SourceRef[];
+};
+
+export type ScrollChapterRecord = {
+  id: string;
+  year: number;
+  title: string;
+  body: string;
+  globeTarget: { lat: number; lon: number; zoomScalar: number };
+  activeSpeciesIds: string[];
+  activeRouteIds: string[];
+  activeLayerIds: Array<keyof LayerState>;
+};
+
+export type ChapterEvidencePanelId =
+  | "biome-pressure"
+  | "population-expansion"
+  | "species-loss"
+  | "geo-change";
+
+export type ChapterVisualRecord = {
+  id: string;
+  chapterId: string;
+  kind: "space-reference" | "change-overlay" | "animal-focus" | "evidence-map";
+  title: string;
+  caption: string;
+  mediaAssetId?: string;
+  sourceRefs: SourceRef[];
+  relatedSpeciesIds?: string[];
+  evidencePanelIds?: ChapterEvidencePanelId[];
 };
 
 export type ReferenceOverlay = {

@@ -51,7 +51,7 @@ const rows: Row[] = [
   ["penguin", "Penguin", "penguin.jpg", "Penguins standing together on coastal rocks.", "Sander Spek", "Public Domain", "https://commons.wikimedia.org/wiki/File:Sander-pinguins.jpg", "https://commons.wikimedia.org/wiki/File:Sander-pinguins.jpg", 960, 626, "image/jpeg"]
 ];
 
-export const mediaAssets: MediaAsset[] = rows.map(
+const wikimediaMediaAssets: MediaAsset[] = rows.map(
   ([
     subjectId,
     title,
@@ -89,6 +89,59 @@ export const mediaAssets: MediaAsset[] = rows.map(
     sourceRefs: [sourceCatalog.wikimediaCommons]
   })
 );
+
+const nasaMediaAssets: MediaAsset[] = [
+  {
+    id: "media-apollo-8-earthrise",
+    kind: "earth",
+    subjectId: "earth-apollo-8",
+    title: "Apollo 8 Earthrise",
+    requiredForDisplay: false,
+    placeholderStatus: "available",
+    sourceUrl: "https://www.nasa.gov/wp-content/uploads/2023/03/apollo08_earthrise.jpg",
+    creator: "NASA / Bill Anders",
+    credit: "NASA",
+    license: "Public Domain",
+    licenseUrl: "https://www.nasa.gov/nasa-brand-center/images-and-media/",
+    attribution: "NASA, Apollo 8: Earthrise, public domain guidance applies unless noted by NASA.",
+    alt: "Earth rising above the lunar horizon in the Apollo 8 Earthrise photograph.",
+    retrievedAt: "2026-05-13",
+    width: 1024,
+    height: 984,
+    mimeType: "image/jpeg",
+    commercialUseCompatible: true,
+    notes:
+      "Used as Apollo-era space-view reference imagery; early atlas states remain reconstructed from land-cover, population, and climate datasets.",
+    tags: ["Earth", "Apollo 8", "Earthrise", "NASA", "space-view reference"],
+    sourceRefs: [sourceCatalog.nasaApollo8Earthrise, sourceCatalog.nasaImageMediaGuidelines]
+  },
+  {
+    id: "media-apollo-17-blue-marble",
+    kind: "earth",
+    subjectId: "earth-apollo-17",
+    title: "Apollo 17 Blue Marble",
+    requiredForDisplay: false,
+    placeholderStatus: "available",
+    sourceUrl: "https://www.nasa.gov/wp-content/uploads/2023/03/as17-148-22727_lrg.jpg",
+    creator: "NASA / Apollo 17 crew",
+    credit: "NASA",
+    license: "Public Domain",
+    licenseUrl: "https://www.nasa.gov/nasa-brand-center/images-and-media/",
+    attribution: "NASA, Apollo 17: Blue Marble, public domain guidance applies unless noted by NASA.",
+    alt: "A full disk photograph of Earth from the Apollo 17 mission.",
+    retrievedAt: "2026-05-13",
+    width: 1024,
+    height: 1024,
+    mimeType: "image/jpeg",
+    commercialUseCompatible: true,
+    notes:
+      "Used as Apollo-era whole-Earth context; it is not a literal photograph of 1770, 1900, or 1954 Earth-state conditions.",
+    tags: ["Earth", "Apollo 17", "Blue Marble", "NASA", "space-view reference"],
+    sourceRefs: [sourceCatalog.nasaApollo17BlueMarble, sourceCatalog.nasaImageMediaGuidelines]
+  }
+];
+
+export const mediaAssets: MediaAsset[] = [...wikimediaMediaAssets, ...nasaMediaAssets];
 
 export function getMediaAsset(assetId?: string) {
   return mediaAssets.find((asset) => asset.id === assetId);

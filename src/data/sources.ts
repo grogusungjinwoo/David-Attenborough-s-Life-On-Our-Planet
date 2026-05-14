@@ -155,6 +155,33 @@ export const sourceCatalog = {
     accessed: "2026-05-13",
     note: "Open NASA global satellite basemap source for bundled static imagery."
   },
+  nasaApollo8Earthrise: {
+    id: "nasa-apollo-8-earthrise",
+    label: "Apollo 8: Earthrise",
+    publisher: "NASA",
+    url: "https://www.nasa.gov/image-article/apollo-8-earthrise/",
+    accessed: "2026-05-13",
+    note:
+      "Apollo-era Earth-from-space photograph used as space-view reference imagery, not as literal evidence for pre-spaceflight atlas years."
+  },
+  nasaApollo17BlueMarble: {
+    id: "nasa-apollo-17-blue-marble",
+    label: "Apollo 17: Blue Marble",
+    publisher: "NASA",
+    url: "https://www.nasa.gov/image-article/apollo-17-blue-marble/",
+    accessed: "2026-05-13",
+    note:
+      "Apollo-era whole-Earth photograph used as visual context while historical Earth-state values remain reconstructed from data sources."
+  },
+  nasaImageMediaGuidelines: {
+    id: "nasa-image-media-guidelines",
+    label: "NASA Image and Media Guidelines",
+    publisher: "NASA",
+    url: "https://www.nasa.gov/nasa-brand-center/images-and-media/",
+    accessed: "2026-05-13",
+    note:
+      "NASA media-use guidance for educational and informational use with NASA acknowledged as source."
+  },
   noaaHistoricalLandCover: {
     id: "noaa-historical-land-cover-1770-2010",
     label: "Historical Land-Cover Change and Land-Use Conversions Global Dataset",
@@ -294,6 +321,49 @@ export const sourceCatalog = {
     url: "https://docs.protomaps.com/pmtiles/",
     accessed: "2026-05-13",
     note: "Range-request-friendly tile archive format for static vector/raster delivery."
+  },
+  unctadMaritimeTransport: {
+    id: "unctad-review-maritime-transport",
+    label: "Review of Maritime Transport",
+    publisher: "UN Trade and Development",
+    url: "https://unctad.org/RMT",
+    accessed: "2026-05-13",
+    note:
+      "Flagship maritime transport source for seaborne trade, ports, shipping networks, and route context."
+  },
+  wtoTradeStats: {
+    id: "wto-world-trade-statistical-review",
+    label: "World Trade Statistical Review",
+    publisher: "World Trade Organization",
+    url: "https://www.wto.org/english/res_e/statis_e/wts_e.htm",
+    accessed: "2026-05-13",
+    note: "Global merchandise and services trade context for modern trade-route intensity."
+  },
+  worldBankWits: {
+    id: "world-bank-wits",
+    label: "World Integrated Trade Solution",
+    publisher: "World Bank",
+    url: "https://wits.worldbank.org/",
+    accessed: "2026-05-13",
+    note:
+      "Trade-data portal integrating UN COMTRADE, UNCTAD, WTO, and related trade datasets."
+  },
+  oecdContainerTransport: {
+    id: "oecd-container-transport",
+    label: "Container transport indicator",
+    publisher: "OECD / International Transport Forum",
+    url: "https://www.oecd.org/en/data/indicators/container-transport.html",
+    accessed: "2026-05-13",
+    note: "Container transport source for late twentieth-century and current shipping-route context."
+  },
+  teleGeographySubmarineCableMap: {
+    id: "telegeography-submarine-cable-map",
+    label: "Submarine Cable Map",
+    publisher: "TeleGeography",
+    url: "https://www.submarinecablemap.com/",
+    accessed: "2026-05-13",
+    note:
+      "Public map reference for present-day submarine cable corridors; used only for route-context metadata."
   },
   neuralGcm: {
     id: "neuralgcm-github",
